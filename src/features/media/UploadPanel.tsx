@@ -45,7 +45,7 @@ export function UploadPanel({ file, purpose, crop, onConfirmed, auto = false }: 
     <p role="status">{labels[state.phase]}{state.phase==='uploading' ? ` ${state.percent}%` : ''}</p>
     {state.phase==='uploading' && <progress value={state.percent} max={100} aria-label={`Subida de ${file.name}`}/>}
     {error && <p role="alert">{error}</p>}
-    {state.phase!=='confirmed' && <button disabled={busy} onClick={()=>void run()}>{state.phase==='error' || state.phase==='cancelled' ? 'Reintentar' : 'Procesar y subir'}</button>}
-    {busy && <button onClick={()=>controller.current?.abort()}>Cancelar subida</button>}
+    {state.phase!=='confirmed' && <button type="button" disabled={busy} onClick={()=>void run()}>{state.phase==='error' || state.phase==='cancelled' ? 'Reintentar' : 'Procesar y subir'}</button>}
+    {busy && <button type="button" onClick={()=>controller.current?.abort()}>Cancelar subida</button>}
   </div>
 }
