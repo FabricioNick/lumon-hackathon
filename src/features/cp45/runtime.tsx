@@ -2,6 +2,7 @@
 import { createContext, useContext } from 'react'
 import type { ReactNode } from 'react'
 import type { Refiner } from './contracts'
+import type { StorageConfig } from '../media/storageClient'
 
 export type FloorEvent =
   | { type: 'refiner.updated'; eventId: number; data: { id: number; version: number; refiner: Refiner } }
@@ -13,6 +14,7 @@ export type FloorEvent =
 export interface Cp45Runtime {
   /** Authenticated fetch from CP1: adds Authorization/build and handles coordinated refresh. */
   request: (path: string, init?: RequestInit) => Promise<Response>
+  storage?: StorageConfig
   userId: number | null
   /** Stable across tabs for this login; change on logout/new login. Never a token. */
   sessionKey: string
