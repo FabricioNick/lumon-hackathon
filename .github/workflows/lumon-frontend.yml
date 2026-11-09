@@ -16,3 +16,19 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run lint
+      - name: Inspect exact Lumon endpoint contracts
+        shell: bash
+        run: |
+          curl -fsSL --max-time 20 https://lumon-api.vercel.app/openapi.json -o /tmp/spec.json
+          node - <<'NODE'
+          const s = require('/tmp/spec.json')
+          const endpoints = ['/auth/register','/auth/login','/auth/logout','/auth/me','/auth/refresh','/integrations/status','/integrations/deploy/challenge','/integrations/deploy/verify','/clearance','/clearance/status','/clearance/check','/team/roster','/events/tickets','/events/stream','/meta/health','/team/members']
+          for (const end of endpoints) {
+            const entry = Object.entries(s.paths).find(([path])=>path.endsWith(end))
+            if (!entry) { console.log('ENDPOINT', end, 'NOT FOUND'); continue }
+            for (const [method,op] of Object.entries(entry[1])) {
+              console.log('ENDPOINT',end,method.toUpperCase(),JSON.stringify({requestBody:op.requestBody?.content?.['application/json']?.schema,response200:op.responses?.['200']?.content?.['application/json']?.schema,response201:op.responses?.['201']?.content?.['application/json']?.schema,description:op.description?.slice(0,340)}))
+            }
+          }
+          for (const schema of ['RegisterRequest','RegisterResponse','LoginResponse','TokenPair','RefreshRequest','AuthMeResponse','User','RosterRequest','RosterMember','IntegrationStatus','ClearanceStatus','DeployChallenge','EventStreamTicket']) console.log('MODEL',schema,JSON.stringify(s.components.schemas[schema]??'NOT FOUND'))
+          NODE
