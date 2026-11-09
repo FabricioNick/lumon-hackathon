@@ -29,6 +29,9 @@ jobs:
                 const doc = JSON.parse(fs.readFileSync("/tmp/lumon-spec.json", "utf8"));
                 if (!doc.paths) process.exit(1);
                 console.log("OpenAPI version:", doc.openapi || doc.swagger || "unknown");
+                for (const [name, schema] of Object.entries(doc.components?.schemas || {})) {
+                  if (/Roster|Register|AuthMe|Login|Refiner|Profile|Clearance|Deploy|Integration/i.test(name)) console.log("SCHEMA", name, JSON.stringify(schema).slice(0, 3200));
+                }
                 for (const wanted of ["/auth/register", "/auth/login", "/auth/refresh", "/team/roster", "/integrations/deploy/challenge", "/integrations/deploy/verify", "/clearance/check", "/events/tickets"]) {
                   const key = Object.keys(doc.paths).find(k => k.endsWith(wanted));
                   if (key) console.log("CONTRACT", key, JSON.stringify(doc.paths[key]).slice(0, 5000));
