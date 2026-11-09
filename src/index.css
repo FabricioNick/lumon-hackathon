@@ -136,4 +136,12 @@
 }
 .mdr-cell {
   user-select: none;
+body {
+  margin: 0;
+}
+#root {
+  min-height: 100svh;
+}
+* {
+  box-sizing: border-box;
 }
