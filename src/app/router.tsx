@@ -1,7 +1,8 @@
-import { lazy, Suspense, useEffect, useMemo, useSyncExternalStore } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import type { ComponentType } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { getAuthSnapshot, restoreAuth, subscribeAuth } from '../core/auth/authService'
+import { apiRequest } from '../core/apiClient'
 import { Layout } from '../components/Layout'
 import { RouteBoundary } from '../components/RouteBoundary'
 import { AuthPage } from '../features/auth/AuthPage'
@@ -61,7 +62,42 @@ function Home() {
 }
 
 function AppRoutes() {
+  const [health, setHealth] = useState<'checking' | 'online' | 'offline'>('checking')
+  const [manualRetry, setManualRetry] = useState(0)
   useEffect(() => { void restoreAuth() }, [])
+  useEffect(() => {
+    let active = true
+    let timer: ReturnType<typeof setTimeout>
+    let attempts = 0
+    let controller: AbortController | null = null
+    const check = async () => {
+      controller = new AbortController()
+      const timeout = setTimeout(() => controller?.abort(), 10000)
+      try {
+        await apiRequest('/meta/health', { auth: false, retry: false, signal: controller.signal })
+        if (!active) return
+        setHealth('online')
+        attempts = 0
+        timer = setTimeout(() => { void check() }, 30000)
+      } catch {
+        if (!active) return
+        attempts++
+        setHealth('offline')
+        timer = setTimeout(() => { void check() }, Math.min(2000 * 2 ** (attempts - 1), 30000))
+      } finally { clearTimeout(timeout) }
+    }
+    void check()
+    return () => { active = false; controller?.abort(); clearTimeout(timer) }
+  }, [manualRetry])
+  if (health !== 'online') return <main className="auth-screen"><section className="auth-card">
+    <p className="eyebrow">LUMON INDUSTRIES</p>
+    <h1>Conectando con Lumon…</h1>
+    <p className="muted">{health === 'offline' ? 'No responde el servicio. Se reintentará la conexión automáticamente.' : 'Verificando el estado del servidor.'}</p>
+    {health === 'offline' && <button type="button" className="button primary" onClick={() => {
+      setHealth('checking')
+      setManualRetry(previous => previous + 1)
+    }}>Reintentar ahora</button>}
+  </section></main>
   return <BrowserRouter>
     <Routes>
       <Route path="/login" element={<AuthPage mode="login" />} />
