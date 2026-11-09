@@ -1,5 +1,5 @@
 import { apiRequest } from '../apiClient'
-import { clearTokens, hasRefreshToken, isTokenPair, refreshAccessToken, setTokens, subscribeSession } from './tokenStore'
+import { clearTokens, getAccessToken, getRefreshToken, hasRefreshToken, isTokenPair, refreshAccessToken, setTokens, subscribeSession } from './tokenStore'
 
 export interface LumonUser {
   id?: number | string
@@ -60,13 +60,17 @@ export async function restoreAuth() {
 async function startSession(path: '/auth/login' | '/auth/register', body: LoginPayload | RegisterPayload) {
   const result: unknown = await apiRequest<unknown>(path, { method: 'POST', body, auth: false, retry: false })
   if (!isTokenPair(result)) throw new Error('Lumon no devolvió un par válido de tokens.')
+  update({ status: 'loading', user: null, error: null })
   setTokens(result)
   await loadProfile()
 }
 export function login(body: LoginPayload) { return startSession('/auth/login', body) }
 export function register(body: RegisterPayload) { return startSession('/auth/register', body) }
 export async function logout() {
-  try { await apiRequest<void>('/auth/logout', { method: 'POST', retry: false }) } finally {
+  const refreshToken = getRefreshToken()
+  try {
+    if (refreshToken) await apiRequest<void>('/auth/logout', { method: 'POST', body: { refreshToken }, auth: false, retry: false })
+  } finally {
     clearTokens()
     update({ status: 'anonymous', user: null, error: null })
   }
@@ -74,5 +78,8 @@ export async function logout() {
 subscribeSession(() => {
   if (!hasRefreshToken() && snapshot.status !== 'anonymous') {
     update({ status: 'anonymous', user: null, error: 'La sesión se cerró o fue revocada.' })
+  } else if (hasRefreshToken() && getAccessToken() && snapshot.status === 'anonymous') {
+    update({ status: 'loading', user: null, error: null })
+    void loadProfile().catch(() => update({ status: 'anonymous', user: null, error: 'No se pudo restaurar la sesión en esta pestaña.' }))
   }
 })
