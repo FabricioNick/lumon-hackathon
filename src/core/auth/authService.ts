@@ -12,7 +12,6 @@ export interface LumonUser {
 }
 export interface RegisterPayload {
   teamName: string
-  displayName: string
   email: string
   password: string
 }

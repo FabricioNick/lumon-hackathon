@@ -9,7 +9,6 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const [teamName, setTeamName] = useState('')
-  const [displayName, setDisplayName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -27,13 +26,14 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
     setFields({})
     try {
       if (mode === 'login') await login({ email, password })
-      else await register({ teamName, displayName, email, password })
+      else await register({ teamName, email, password })
       navigate(destination, { replace: true })
     } catch (failure) {
       if (failure instanceof ApiError) {
         setError(`${failure.code}: ${failure.message}`)
         if (failure.details && typeof failure.details === 'object' && !Array.isArray(failure.details)) {
-          setFields(Object.fromEntries(Object.entries(failure.details).map(([key, value]) => [key, String(value)])))
+          const details = 'fields' in failure.details && failure.details.fields && typeof failure.details.fields === 'object' ? failure.details.fields : failure.details
+          setFields(Object.fromEntries(Object.entries(details).map(([key, value]) => [key, String(value)])))
         }
       } else setError(failure instanceof Error ? failure.message : 'No se pudo iniciar sesión.')
     } finally { setBusy(false) }
@@ -50,7 +50,6 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
       <form className="stack" onSubmit={event => void submit(event)}>
         {mode === 'register' && <>
           <label>Nombre de la cuadrilla<input required value={teamName} onChange={e => setTeamName(e.target.value)} autoComplete="organization" />{fields.teamName && <small>{fields.teamName}</small>}</label>
-          <label>Nombre del supervisor<input required value={displayName} onChange={e => setDisplayName(e.target.value)} autoComplete="name" />{fields.displayName && <small>{fields.displayName}</small>}</label>
         </>}
         <label>Correo electrónico<input required type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" />{fields.email && <small>{fields.email}</small>}</label>
         <label>Contraseña<input required minLength={8} type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete={mode === 'register' ? 'new-password' : 'current-password'} />{fields.password && <small>{fields.password}</small>}</label>

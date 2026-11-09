@@ -3,7 +3,11 @@ import { ApiError, apiRequest } from '../../core/apiClient'
 import { getAuthSnapshot, subscribeAuth } from '../../core/auth/authService'
 import { API_BASE_URL, BUILD } from '../../core/config'
 
-interface DeployChallenge { token: string; path?: string }
+interface DeployChallenge { token: string; wellKnownPath: string; expiresAt: string }
+interface RosterMember { name: string; code: string }
+interface RosterResponse { members: RosterMember[]; complete: boolean; locked: boolean }
+const emptyMembers = (): RosterMember[] => Array.from({ length: 3 }, () => ({ name: '', code: '' }))
+
 function formatError(error: unknown) {
   return error instanceof ApiError ? `${error.code} (${error.status}): ${error.message}` : error instanceof Error ? error.message : 'Error inesperado'
 }
@@ -16,8 +20,8 @@ export function StatusPage() {
   const [online, setOnline] = useState<'checking' | 'online' | 'offline'>('checking')
   const [integrations, setIntegrations] = useState<unknown>(null)
   const [clearance, setClearance] = useState<unknown>(null)
-  const [roster, setRoster] = useState<unknown>(null)
-  const [rosterBody, setRosterBody] = useState('{\n  "members": [\n    { "name": "", "studentCode": "" },\n    { "name": "", "studentCode": "" },\n    { "name": "", "studentCode": "" }\n  ]\n}')
+  const [roster, setRoster] = useState<RosterResponse | null>(null)
+  const [members, setMembers] = useState<RosterMember[]>(emptyMembers)
   const [challenge, setChallenge] = useState<DeployChallenge | null>(null)
   const [message, setMessage] = useState('')
   const [working, setWorking] = useState(false)
@@ -26,11 +30,14 @@ export function StatusPage() {
     const [a, b, c] = await Promise.allSettled([
       apiRequest('/integrations/status'),
       apiRequest('/clearance'),
-      apiRequest('/team/roster')
+      apiRequest<RosterResponse>('/team/roster')
     ])
     if (a.status === 'fulfilled') setIntegrations(a.value)
     if (b.status === 'fulfilled') setClearance(b.value)
-    if (c.status === 'fulfilled') setRoster(c.value)
+    if (c.status === 'fulfilled') {
+      setRoster(c.value)
+      if (Array.isArray(c.value.members) && c.value.members.length === 3) setMembers(c.value.members)
+    }
   }, [])
 
   useEffect(() => { void refresh() }, [refresh])
@@ -60,8 +67,7 @@ export function StatusPage() {
     setMessage('')
     try {
       const response = await action()
-      setMessage(success)
-      if (response !== undefined) setMessage(success + '\n' + JSON.stringify(response, null, 2))
+      setMessage(response === undefined ? success : success + '\n' + JSON.stringify(response, null, 2))
       await refresh()
     } catch (error) { setMessage(formatError(error)) }
     finally { setWorking(false) }
@@ -71,6 +77,7 @@ export function StatusPage() {
     setWorking(true)
     setMessage('')
     try {
+      if (location.protocol !== 'https:') throw new Error('Solicita el challenge desde un dominio HTTPS público.')
       const result = await apiRequest<DeployChallenge>('/integrations/deploy/challenge', {
         method: 'POST', body: { origin: window.location.origin }, retry: false
       })
@@ -80,17 +87,21 @@ export function StatusPage() {
     finally { setWorking(false) }
   }
 
-  const submitRoster = () => {
-    let body: unknown
-    try { body = JSON.parse(rosterBody) as unknown }
-    catch { setMessage('JSON de integrantes inválido.'); return }
-    void act(() => apiRequest('/team/roster', { method: 'PUT', body, retry: false }), 'Cuadrilla inscrita.')
+  const saveRoster = () => {
+    const valid = members.length === 3 && members.every(member => member.name.trim().length >= 3 && /^[A-Za-z0-9-]{1,20}$/.test(member.code.trim()))
+    if (!valid) { setMessage('Completa los tres nombres (3 o más caracteres) y los tres códigos alfanuméricos.'); return }
+    const body = { members: members.map(member => ({ name: member.name.trim(), code: member.code.trim() })) }
+    void act(() => apiRequest('/team/roster', { method: 'PUT', body, retry: false }), 'Los tres integrantes quedaron inscritos.')
+  }
+
+  const editMember = (index: number, field: keyof RosterMember, value: string) => {
+    setMembers(previous => previous.map((member, i) => i === index ? { ...member, [field]: value } : member))
   }
 
   return <div className="status-page">
     <div className="page-heading">
       <div><p className="eyebrow">SALA DE BIENESTAR · CP3 / CP6</p><h1>Estado del piso</h1></div>
-      <button className="button secondary" onClick={() => void refresh()}>Actualizar estado</button>
+      <button className="button secondary" disabled={working} onClick={() => void refresh()}>Actualizar estado</button>
     </div>
     <div className="stats">
       <div className="stat"><span className="eyebrow">Build</span><strong className="value">{BUILD}</strong><small className="muted">SHA del despliegue</small></div>
@@ -102,26 +113,38 @@ export function StatusPage() {
       <section className="panel">
         <p className="eyebrow">Integraciones</p><h2>Estado de producción</h2>
         <Format data={integrations} />
-        <div className="row-buttons"><button className="button secondary" disabled={working} onClick={() => void requestChallenge()}>Solicitar challenge</button><button className="button primary" disabled={working} onClick={() => void act(() => apiRequest('/integrations/deploy/verify', { method: 'POST', body: { origin: location.origin }, retry: false }), 'Dominio verificado.')}>Verificar dominio</button></div>
+        <div className="row-buttons">
+          <button className="button secondary" disabled={working || location.protocol !== 'https:'} onClick={() => void requestChallenge()}>Solicitar challenge</button>
+          <button className="button primary" disabled={working || location.protocol !== 'https:'} onClick={() => void act(() => apiRequest('/integrations/deploy/verify', { method: 'POST', retry: false }), 'Dominio verificado.')}>Verificar dominio</button>
+        </div>
         {challenge && <div className="stack">
           <p>Publica exclusivamente este token en <code>public/.well-known/lumon-verification.txt</code> y vuelve a desplegar antes de verificar.</p>
           <textarea aria-label="Token de verificación" readOnly value={challenge.token} rows={2}/>
           <button className="button secondary" onClick={() => void navigator.clipboard.writeText(challenge.token)}>Copiar token</button>
-          {challenge.path && <p className="muted small">Ruta esperada: {challenge.path}</p>}
+          <p className="muted small">Ruta: {challenge.wellKnownPath}. Vence: {new Date(challenge.expiresAt).toLocaleString()}.</p>
         </div>}
       </section>
       <section className="panel">
         <p className="eyebrow">Autorización</p><h2>Revisión automática</h2>
         <Format data={clearance} />
-        <p className="muted small">Ejecutar únicamente desde la app desplegada. CP2 requiere actividad real con caos e idempotencia.</p>
+        <p className="muted small">Solo funciona en producción, tras verificar dominio y completar CP1 y CP2.</p>
         <button className="button primary" disabled={working || location.hostname === 'localhost'} onClick={() => void act(() => apiRequest('/clearance/check', { method: 'POST', retry: false }), 'Revisión ejecutada.')}>Abrir el Piso de Pruebas</button>
       </section>
       <section className="panel">
         <p className="eyebrow">Rondas · CP3</p><h2>Inscripción de los tres integrantes</h2>
-        <p className="muted small">Ajusta el cuerpo JSON según el esquema de PUT /team/roster en Swagger. Los nombres y códigos reales son obligatorios.</p>
-        <textarea value={rosterBody} onChange={event => setRosterBody(event.target.value)} aria-label="Cuerpo JSON para inscripción de la cuadrilla" rows={10}/>
-        <button className="button primary" disabled={working} onClick={submitRoster}>Inscribir integrantes</button>
-        <h3>Inscripción actual</h3><Format data={roster}/>
+        {roster?.locked && <p className="notice">La inscripción fue bloqueada por el sorteo. No es posible cambiarla.</p>}
+        <div className="stack">
+          {members.map((member, index) => <div className="row-buttons" key={index}>
+            <label className="field" style={{ flex: 2 }}>Integrante {index + 1}
+              <input value={member.name} maxLength={80} disabled={roster?.locked} onChange={event => editMember(index, 'name', event.target.value)} placeholder="Nombre y apellido" />
+            </label>
+            <label className="field" style={{ flex: 1 }}>Código UTEC
+              <input value={member.code} maxLength={20} disabled={roster?.locked} onChange={event => editMember(index, 'code', event.target.value)} placeholder="Código" />
+            </label>
+          </div>)}
+        </div>
+        <button className="button primary" disabled={working || roster?.locked || !session.user?.permissions?.includes('team:manage')} onClick={saveRoster}>Inscribir integrantes</button>
+        <p className="muted small">Estado: {roster?.complete ? 'Los tres integrantes están inscritos.' : 'Pendiente de completar.'}</p>
       </section>
       <section className="panel">
         <p className="eyebrow">Acceso</p><h2>Permisos de tu cuenta</h2>
