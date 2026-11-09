@@ -7,5 +7,5 @@ function endpoint(value: unknown, protocols: string[]): string {
 export const config = {
   get api() { return endpoint(import.meta.env.VITE_API_BASE_URL, ['http:', 'https:']) },
   get ws() { return endpoint(import.meta.env.VITE_WS_BASE_URL, ['ws:', 'wss:']) },
-  build: import.meta.env.VITE_BUILD_SHA as string,
+  build: import.meta.env?.VITE_BUILD_SHA ?? 'dev',
 }

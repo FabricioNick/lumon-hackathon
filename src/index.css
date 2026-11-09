@@ -24,3 +24,5 @@
 .placeholder { color: #6c9995; }
 @keyframes tremor { 0%,100% { transform: translate(0,0); } 33% { transform: translate(1px,-1px); } 66% { transform: translate(-1px,1px); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+.mdr-cell.selected { touch-action: none; }
+.bin:not(:disabled):hover, .bin:not(:disabled):focus { background: #235961; }

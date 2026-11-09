@@ -46,7 +46,8 @@ export const VirtualGrid = memo(function VirtualGrid({ store, rules, selected, d
   for (let r = startR; r < endR; r++) for (let c = startC; c < endC; c++) tileKeys.add(store.key(r, c))
   tileKeys.add(store.key(focus.r, focus.c))
   const tileSignature = [...tileKeys].sort().join(',')
-  useEffect(() => { store.viewport(new Set(tileSignature.split(','))); return () => store.viewport(new Set()) }, [store, tileSignature])
+  useEffect(() => { store.viewport(new Set(tileSignature.split(','))) }, [store, tileSignature])
+  useEffect(() => () => store.viewport(new Set()), [store])
   useLayoutEffect(() => {
     if (focusRequested.current) { element.current?.querySelector<HTMLElement>(`[data-cell="${cellKey(focus)}"]`)?.focus({ preventScroll: true }); focusRequested.current = false }
   }, [focus, position])
