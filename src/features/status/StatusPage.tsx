@@ -23,6 +23,7 @@ export function StatusPage() {
   const [roster, setRoster] = useState<RosterResponse | null>(null)
   const [members, setMembers] = useState<RosterMember[]>(emptyMembers)
   const [challenge, setChallenge] = useState<DeployChallenge | null>(null)
+  const [deploymentOrigin, setDeploymentOrigin] = useState('')
   const [message, setMessage] = useState('')
   const [working, setWorking] = useState(false)
 
@@ -77,9 +78,11 @@ export function StatusPage() {
     setWorking(true)
     setMessage('')
     try {
-      if (location.protocol !== 'https:') throw new Error('Solicita el challenge desde un dominio HTTPS público.')
+      const origin = deploymentOrigin.trim() || window.location.origin
+      const parsed = new URL(origin)
+      if (parsed.protocol !== 'https:' || parsed.origin !== origin) throw new Error('Escribe un origen HTTPS sin rutas, por ejemplo https://mi-app.vercel.app')
       const result = await apiRequest<DeployChallenge>('/integrations/deploy/challenge', {
-        method: 'POST', body: { origin: window.location.origin }, retry: false
+        method: 'POST', body: { origin }, retry: false
       })
       setChallenge(result)
       setMessage('Challenge recibido. Publica el token antes de verificar el dominio.')
@@ -113,12 +116,16 @@ export function StatusPage() {
       <section className="panel">
         <p className="eyebrow">Integraciones</p><h2>Estado de producción</h2>
         <Format data={integrations} />
+        <label className="field">Origen de producción
+          <input type="url" value={deploymentOrigin} onChange={event => setDeploymentOrigin(event.target.value)} placeholder="https://su-app.vercel.app" />
+          <small className="muted">Puedes pedir y verificar el challenge desde localhost; coloca aquí la URL HTTPS de Vercel.</small>
+        </label>
         <div className="row-buttons">
-          <button className="button secondary" disabled={working || location.protocol !== 'https:'} onClick={() => void requestChallenge()}>Solicitar challenge</button>
-          <button className="button primary" disabled={working || location.protocol !== 'https:'} onClick={() => void act(() => apiRequest('/integrations/deploy/verify', { method: 'POST', retry: false }), 'Dominio verificado.')}>Verificar dominio</button>
+          <button className="button secondary" disabled={working} onClick={() => void requestChallenge()}>Solicitar challenge</button>
+          <button className="button primary" disabled={working} onClick={() => void act(() => apiRequest('/integrations/deploy/verify', { method: 'POST', retry: false }), 'Dominio verificado.')}>Verificar dominio</button>
         </div>
         {challenge && <div className="stack">
-          <p>Publica exclusivamente este token en <code>public/.well-known/lumon-verification.txt</code> y vuelve a desplegar antes de verificar.</p>
+          <p>Publica exclusivamente este token en <code>public/.well-known/lumon-verification.txt</code>, comprueba la URL pública y vuelve a verificar. El token es público, pero las credenciales de login no.</p>
           <textarea aria-label="Token de verificación" readOnly value={challenge.token} rows={2}/>
           <button className="button secondary" onClick={() => void navigator.clipboard.writeText(challenge.token)}>Copiar token</button>
           <p className="muted small">Ruta: {challenge.wellKnownPath}. Vence: {new Date(challenge.expiresAt).toLocaleString()}.</p>
