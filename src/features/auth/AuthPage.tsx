@@ -17,6 +17,9 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const next = params.get('next')
   const destination = next?.startsWith('/') && !next.startsWith('//') ? next : '/'
 
+  if (session.status === 'loading') return <main className="auth-screen"><section className="auth-card">
+    <p className="eyebrow">LUMON INDUSTRIES</p><h1>Conectando con Lumon…</h1><p>Restaurando la sesión de forma segura.</p>
+  </section></main>
   if (session.status === 'authenticated') return <Navigate to={destination} replace />
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
