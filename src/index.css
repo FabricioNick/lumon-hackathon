@@ -14,3 +14,13 @@
   progress { width: 100%; accent-color: #74e7c4; }
   [role=alert] { color: #ffcebd; padding: .6rem 0; }
 }
+.mdr-viewport { overflow: auto; width: 100%; max-width: 1620px; height: min(56vh, 1000px); min-height: 240px; position: relative; border: 1px solid #619b95; overscroll-behavior: contain; }
+.mdr-cell { position: absolute; width: 36px; height: 36px; display: grid; place-items: center; font-size: 19px; cursor: pointer; border: 1px solid transparent; }
+.mdr-cell.scary { color: #ffe59b; font-weight: bold; text-decoration: underline dotted; }
+.mdr-cell.scary span { animation: tremor var(--tremor-time) infinite alternate; }
+.mdr-cell.selected { background: #285c65; border-color: #ffdc79; }
+.mdr-cell.refined { background: #173e3d; color: #87b6b0; font-size: 13px; }
+.mdr-cell:focus-visible { outline-offset: -3px; z-index: 2; }
+.placeholder { color: #6c9995; }
+@keyframes tremor { 0%,100% { transform: translate(0,0); } 33% { transform: translate(1px,-1px); } 66% { transform: translate(-1px,1px); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
