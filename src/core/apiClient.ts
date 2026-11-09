@@ -8,15 +8,18 @@ export interface LumonErrorBody {
   requestId?: string
 }
 export class ApiError extends Error {
-  constructor(
-    public status: number,
-    public code: string,
-    message: string,
-    public details: unknown = null,
-    public requestId?: string
-  ) {
+  status: number
+  code: string
+  details: unknown
+  requestId?: string
+
+  constructor(status: number, code: string, message: string, details: unknown = null, requestId?: string) {
     super(message)
     this.name = 'ApiError'
+    this.status = status
+    this.code = code
+    this.details = details
+    this.requestId = requestId
   }
 }
 export interface ApiOptions extends Omit<RequestInit, 'body'> {
