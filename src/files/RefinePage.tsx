@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { DragEvent, PointerEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { useSession } from '../App'
+import { useSession } from '../auth/useSession'
 import { bins, cellKey, fileSchema, refineSchema, rulesSchema } from '../lib/contracts'
 import type { Bin, Cell, DataFile, Rules } from '../lib/contracts'
 import { aborted, ApiError, message, request } from '../lib/http'
@@ -10,41 +10,37 @@ import type { Group } from './groups'
 import { TileStore } from './tiles'
 import { VirtualGrid } from './VirtualGrid'
 import { FloorClient } from '../floor/client'
-import type { FloorState } from '../floor/client'
-const noFloor: FloorState = { status: 'offline', message: '', members: [], claims: [], own: null }
-const emptySubscribe = () => () => {}
-const emptySnapshot = () => noFloor
 import { FloorOverlay, FloorPanel } from '../floor/Floor'
 
 export default function RefinePage() {
   const { id } = useParams()
   const { user } = useSession()
   const [loaded, setLoaded] = useState<{ file: DataFile; rules: Rules } | null>(null)
-  const [error, setError] = useState('')
+  const [failure, setFailure] = useState({ id: '', message: '' })
+  const error = failure.id === id ? failure.message : ''
   const [retry, setRetry] = useState(0)
   const canRead = !!user?.permissions.includes('files:read')
   useEffect(() => {
-    setLoaded(null); setError('')
     if (!canRead || !id || !/^[1-9]\d*$/.test(id)) return
     const controller = new AbortController()
     void Promise.all([request(`/files/${id}`, fileSchema, { signal: controller.signal }), request(`/files/${id}/rules`, rulesSchema, { signal: controller.signal })])
       .then(([file, rules]) => { if (!controller.signal.aborted) setLoaded({ file, rules }) })
-      .catch(e => { if (!controller.signal.aborted) setError(message(e)) })
+      .catch(e => { if (!controller.signal.aborted) setFailure({ id, message: message(e) }) })
     return () => controller.abort()
   }, [id, retry, canRead])
   if (!canRead) return <h1>Sin permiso para leer archivos</h1>
   if (!id || !/^[1-9]\d*$/.test(id)) return <h1>Identificador de archivo inválido</h1>
-  if (error) return <div role="alert">{error} <button onClick={() => setRetry(n => n + 1)}>Reintentar</button> <Link to="/files">Archivos</Link></div>
+  if (error) return <div role="alert">{error} <button onClick={() => { setFailure({ id: '', message: '' }); setRetry(n => n + 1) }}>Reintentar</button> <Link to="/files">Archivos</Link></div>
   if (!loaded || String(loaded.file.id) !== id) return <p role="status">Cargando archivo y reglas…</p>
   return <Console key={id} initial={loaded.file} rules={loaded.rules} canRefine={!!user?.permissions.includes('files:refine')} />
 }
 
 function Console({ initial, rules, canRefine }: { initial: DataFile; rules: Rules; canRefine: boolean }) {
   const { user } = useSession()
-  const [floor, setFloor] = useState<FloorClient | null>(null)
-  const floorState = useSyncExternalStore(floor?.subscribe ?? emptySubscribe, floor?.snapshot ?? emptySnapshot)
+  const [floor] = useState(() => new FloorClient(initial.id))
+  const floorState = useSyncExternalStore(floor.subscribe, floor.snapshot)
   const [file, setFile] = useState(initial)
-  const [store, setStore] = useState<TileStore | null>(null)
+  const [store] = useState(() => new TileStore(initial))
   const [group, setGroup] = useState<Group | null>(null)
   const [selecting, setSelecting] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -55,17 +51,18 @@ function Console({ initial, rules, canRefine }: { initial: DataFile; rules: Rule
   const groupRef = useRef<Group | null>(null)
   const intents = useRef(new Map<string, string>())
   const alive = useRef(true)
-  const currentFile = useRef(file); currentFile.current = file
+  const currentFile = useRef(file)
+  useEffect(() => { currentFile.current = file }, [file])
   const pointerCleanup = useRef<(() => void) | null>(null)
   useEffect(() => {
     alive.current = true
-    const next = new TileStore(initial); setStore(next)
-    return () => { alive.current = false; next.dispose(); selection.current?.abort(); mutation.current?.abort(); pointerCleanup.current?.() }
-  }, [initial])
+    store.activate()
+    return () => { alive.current = false; store.dispose(); selection.current?.abort(); mutation.current?.abort(); pointerCleanup.current?.() }
+  }, [store])
   useEffect(() => {
-    const client = new FloorClient(initial.id); setFloor(client); void client.start()
-    return () => client.dispose()
-  }, [initial.id])
+    void floor.start()
+    return () => floor.dispose()
+  }, [floor])
   const cancel = useCallback(() => {
     if (busyRef.current) return
     selection.current?.abort(); floor?.release(); groupRef.current = null; setGroup(null); setSelecting(false); setNotice('Selección cancelada.')
@@ -159,7 +156,7 @@ function Console({ initial, rules, canRefine }: { initial: DataFile; rules: Rule
       <VirtualGrid overlay={overlay} store={store} rules={rules} selected={selectedKeys} disabled={busy} onSelect={select} onCursor={cursor} onDrag={drag} onPointer={pointer} />
       <div className="my-3 flex gap-4 items-center"><p role="status" aria-live="polite" className="min-h-8">{notice}</p><button disabled={busy || (!group && !selecting)} onClick={cancel}>Cancelar</button></div>
       {holder && <p role="alert">Reservado por {holder.displayName}. Espera a que lo libere o selecciona otro grupo.</p>}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{bins.map(bin => <button key={bin} data-bin={bin} disabled={!!holder || floorState.status === 'syncing' || !canRefine || busy || selecting || !group || group.noise || !group.cells.length}
+      <div className="bins grid grid-cols-2 md:grid-cols-4 gap-3 sticky bottom-0 z-10 bg-[#071d24] py-2">{bins.map(bin => <button key={bin} data-bin={bin} disabled={!!holder || floorState.status === 'syncing' || !canRefine || busy || selecting || !group || group.noise || !group.cells.length}
         className="bin p-4" onClick={() => void refine(bin)} onDragOver={event => { if (event.dataTransfer.types.includes('application/x-lumon-group')) { event.preventDefault(); event.dataTransfer.dropEffect = 'move' } }}
         onDrop={event => { event.preventDefault(); if (event.dataTransfer.getData('application/x-lumon-group') === String(initial.id)) void refine(bin) }}>
         <span className="text-xl">{bin}</span><span className="block">{(file.progress[bin] * 100).toFixed(1)} %</span><progress aria-label={`Progreso ${bin}`} value={file.progress[bin]} max={1} /><span className="block text-sm">{busy ? 'Guardando…' : `Refinar en ${bin}`}</span>

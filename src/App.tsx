@@ -1,12 +1,13 @@
-import { Component, lazy, Suspense, useEffect, useState, useSyncExternalStore } from 'react'
+import { Component, lazy, Suspense, useEffect, useState } from 'react'
 import type { ReactNode, FormEvent } from 'react'
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
-import { login, logout, restore, snapshot, subscribe } from './auth/session'
+import { login, logout, restore } from './auth/session'
+import { useSession } from './auth/useSession'
 import { message } from './lib/http'
 
 const Files = lazy(() => import('./files/FilesPage'))
 const Refine = lazy(() => import('./files/RefinePage'))
-export function useSession() { return useSyncExternalStore(subscribe, snapshot) }
+
 class Boundary extends Component<{ children: ReactNode }, { error: boolean }> {
   state = { error: false }
   static getDerivedStateFromError() { return { error: true } }

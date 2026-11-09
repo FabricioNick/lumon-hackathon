@@ -26,3 +26,4 @@
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
 .mdr-cell.selected { touch-action: none; }
 .bin:not(:disabled):hover, .bin:not(:disabled):focus { background: #235961; }
+.mdr-cell { user-select: none; }

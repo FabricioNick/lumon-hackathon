@@ -51,8 +51,7 @@ export class TileStore {
     const existing = this.pending.get(key)
     if (existing) return existing
     const controller = new AbortController()
-    const entry: Pending = { controller, readers: 0, promise: Promise.resolve(null as unknown as Tile) }
-    entry.promise = this.load(key, controller.signal).catch(error => {
+    const promise = this.load(key, controller.signal).catch(error => {
       if (!aborted(error)) { this.errors.set(key, error instanceof Error ? error.message : 'No se pudo cargar el bloque.'); this.emit() }
       throw error
     }).finally(() => {
@@ -60,6 +59,7 @@ export class TileStore {
       // Re-entry while an aborted fetch was settling must not strand a visible tile.
       if (!this.disposed && controller.signal.aborted && this.visible.has(key) && !this.cache.has(key)) this.startVisible(key)
     })
+    const entry: Pending = { controller, readers: 0, promise }
     this.pending.set(key, entry)
     return entry
   }
@@ -97,5 +97,6 @@ export class TileStore {
     for (const key of this.visible) this.startVisible(key)
     this.emit()
   }
+  activate() { this.disposed = false }
   dispose() { this.disposed = true; this.visible.clear(); for (const entry of this.pending.values()) entry.controller.abort(); this.listeners.clear() }
 }

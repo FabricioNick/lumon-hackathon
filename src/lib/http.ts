@@ -6,8 +6,9 @@ export class ApiError extends Error {
   status: number
   code: string
   details: unknown
-  constructor(status: number, code: string, message: string, details?: unknown) {
-    super(message); this.status = status; this.code = code; this.details = details
+  retryAfterMs: number
+  constructor(status: number, code: string, message: string, details?: unknown, retryAfterMs = 0) {
+    super(message); this.status = status; this.code = code; this.details = details; this.retryAfterMs = retryAfterMs
   }
 }
 export function message(error: unknown): string {
@@ -29,6 +30,10 @@ let revoke: (reason: string) => void = () => {}
 export const setAccess = (value: string | null) => { token = value }
 export const configureAuth = (renew: typeof refresh, close: typeof revoke) => { refresh = renew; revoke = close }
 let blockedUntil = 0
+const rateChannel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('lumon.rate-limit')
+rateChannel?.addEventListener('message', event => {
+  if (typeof event.data === 'number' && Number.isFinite(event.data)) blockedUntil = Math.max(blockedUntil, event.data)
+})
 function retryAfter(value: string | null): number {
   if (!value) return 1000
   const n = Number(value)
@@ -49,7 +54,7 @@ export async function request<T>(path: string, schema: z.ZodType<T>, options: Op
     let response: Response
     try {
       response = await fetch(`${config.api}${path}`, {
-        method: options.method ?? 'GET', signal: options.signal,
+        method: options.method ?? 'GET', signal: AbortSignal.any([...(options.signal ? [options.signal] : []), AbortSignal.timeout(20000)]),
         headers: { 'X-Lumon-Build': config.build, ...(!options.public && usedToken ? { Authorization: `Bearer ${usedToken}` } : {}),
           ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...(options.key ? { 'Idempotency-Key': options.key } : {}) },
         body: options.body === undefined ? undefined : JSON.stringify(options.body),
@@ -58,11 +63,19 @@ export async function request<T>(path: string, schema: z.ZodType<T>, options: Op
       if (aborted(error) || !retryable || attempt >= 4) throw error
       await delay(Math.min(16000, 500 * 2 ** attempt) + Math.random() * 300, options.signal); continue
     }
-    if (response.status === 429) blockedUntil = Math.max(blockedUntil, Date.now() + retryAfter(response.headers.get('Retry-After')))
+    if (response.status === 429) {
+      blockedUntil = Math.max(blockedUntil, Date.now() + retryAfter(response.headers.get('Retry-After')))
+      rateChannel?.postMessage(blockedUntil)
+    }
     if ((response.status === 429 || response.status === 503) && retryable && attempt < 5) {
       await delay(Math.max(retryAfter(response.headers.get('Retry-After')), Math.min(16000, 500 * 2 ** attempt)) + Math.random() * 300, options.signal); continue
     }
-    const body: unknown = response.status === 204 ? null : await response.json()
+    let body: unknown
+    try { body = response.status === 204 ? null : await response.json() }
+    catch (error) {
+      if (!retryable || attempt >= 4 || options.signal?.aborted) throw error
+      await delay(500 * 2 ** attempt, options.signal); continue
+    }
     if (response.ok) return schema.parse(body)
     const parsed = errorSchema.safeParse(body)
     const code = parsed.success ? parsed.data.error : 'HTTP_ERROR'
@@ -70,6 +83,6 @@ export async function request<T>(path: string, schema: z.ZodType<T>, options: Op
       if (code === 'TOKEN_EXPIRED' && !refreshed) { refreshed = true; await refresh(usedToken); continue }
       revoke(code)
     }
-    throw new ApiError(response.status, code, parsed.success ? parsed.data.message : `Error HTTP ${response.status}`, parsed.success ? parsed.data.details : undefined)
+    throw new ApiError(response.status, code, parsed.success ? parsed.data.message : `Error HTTP ${response.status}`, parsed.success ? parsed.data.details : undefined, retryAfter(response.headers.get('Retry-After')))
   }
 }

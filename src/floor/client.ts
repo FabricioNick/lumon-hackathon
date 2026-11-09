@@ -39,14 +39,16 @@ export class FloorClient {
     this.socket.send(JSON.stringify(data)); return true
   }
   async start() {
-    if (this.disposed) return
+    if (this.disposed) { this.disposed = false; this.controller = new AbortController() }
+    const signal = this.controller.signal
     this.update({ status: 'connecting', message: 'Conectando al piso…' })
     try {
-      const ticket = await request('/floor/tickets', ticketSchema, { method: 'POST', body: { fileId: this.fileId }, signal: this.controller.signal })
-      if (this.disposed) return
+      const ticket = await request('/floor/tickets', ticketSchema, { method: 'POST', body: { fileId: this.fileId }, signal })
+      if (this.disposed || signal.aborted) return
       const socket = new WebSocket(`${config.ws}/floor/ws?ticket=${encodeURIComponent(ticket.ticket)}`)
       this.socket = socket
       socket.onopen = () => {
+        if (this.disposed || socket !== this.socket) return
         this.pongAt = Date.now(); this.syncAt = Date.now(); this.seq = null
         this.update({ status: 'syncing', message: 'Sincronizando el piso…' })
         this.heartbeat = setInterval(() => {
@@ -78,7 +80,13 @@ export class FloorClient {
               if (data.type === 'claim.granted') this.send({ type: 'release', claimId: data.claimId })
               this.resync(); return
             }
-            if (data.seq <= this.seq) return
+            if (data.seq <= this.seq) {
+              if (data.type === 'claim.granted' && data.claimId !== this.state.own) {
+                this.send({ type: 'release', claimId: data.claimId })
+                if (this.pending?.id === data.requestId) this.rejectPending(new Error('La reserva quedó desactualizada. Vuelve a seleccionar el grupo.'))
+              }
+              return
+            }
             this.seq = data.seq
           }
           if (data.type === 'claim.denied') {
@@ -118,10 +126,10 @@ export class FloorClient {
         this.schedule(event.code === 4429 ? 10000 : 0)
       }
     } catch (e) {
-      if (this.disposed) return
+      if (this.disposed || signal.aborted) return
       const terminal = e instanceof ApiError && [400,401,403,404,423].includes(e.status)
       this.update({ status: terminal ? 'stopped' : 'offline', message: `${message(e)} Refinamiento HTTP disponible.` })
-      if (!terminal) this.schedule()
+      if (!terminal) this.schedule(e instanceof ApiError ? e.retryAfterMs : 0)
     }
   }
   private schedule(minimum = 0) {
