@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+@layer base {
+  .cp45 {
+    font:
+      16px/1.6 system-ui,
+      sans-serif;
+    text-align: left;
+  }
+  .cp45 h1,
+  .cp45 h2 {
+    color: inherit;
+    font-family: inherit;
+    letter-spacing: normal;
+  }
+  .cp45 a {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .cp45 button {
+    cursor: pointer;
+    border: 1px solid #475569;
+    border-radius: 0.3rem;
+    padding: 0.45rem 0.85rem;
+    background: #e2e8f0;
+    color: #0f172a;
+    font: inherit;
+  }
+  .cp45 button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  .cp45 input:not([type="radio"]):not([type="range"]),
+  .cp45 select,
+  .cp45 textarea {
+    display: block;
+    width: min(100%, 38rem);
+    border: 1px solid #64748b;
+    border-radius: 0.25rem;
+    padding: 0.45rem 0.6rem;
+    background: white;
+    color: #0f172a;
+    font: inherit;
+  }
+  .cp45 input[type="radio"] {
+    margin-right: 0.4rem;
+  }
+  .cp45 input[type="range"] {
+    display: inline-block;
+    width: min(20rem, 70%);
+    vertical-align: middle;
+  }
+  .cp45 :focus-visible {
+    outline: 3px solid #0369a1;
+    outline-offset: 3px;
+  }
+  .cp45 dialog::backdrop {
+    background: rgb(2 6 23 / 0.7);
+  }
+  .cp45 p {
+    overflow-wrap: anywhere;
+  }
+}
