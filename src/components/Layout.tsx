@@ -2,10 +2,12 @@ import { useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { getAuthSnapshot, logout, subscribeAuth } from '../core/auth/authService'
+import { getEventStatus, subscribeEventStatus } from '../core/events/eventService'
 
 export function Layout({ children }: { children?: ReactNode }) {
   const session = useSyncExternalStore(subscribeAuth, getAuthSnapshot)
   const [busy, setBusy] = useState(false)
+  const events = useSyncExternalStore(subscribeEventStatus, getEventStatus)
   const navigate = useNavigate()
   const signOut = async () => {
     setBusy(true)
@@ -23,6 +25,7 @@ export function Layout({ children }: { children?: ReactNode }) {
         <NavLink to="/estado">Estado</NavLink>
       </nav>
       <div className="account">
+        <span className="muted small" title="Estado de eventos globales">SSE: {events}</span>
         <span className="muted small">{session.user?.team?.code ?? 'MDR'}</span>
         <button className="button secondary" disabled={busy} onClick={() => void signOut()}>Salir</button>
       </div>

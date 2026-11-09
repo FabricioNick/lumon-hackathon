@@ -28,7 +28,7 @@ function changeStatus(status: EventConnection, publish = true) {
 function accept(event: LumonEvent, publish = true) {
   if (event.id && seen.has(event.id)) return
   if (event.id) {
-    lastEventId = event.id
+    if (/^\d+$/.test(event.id) && (!lastEventId || BigInt(event.id) > BigInt(lastEventId))) lastEventId = event.id
     seen.add(event.id)
     if (seen.size > 3000) seen.delete(seen.values().next().value ?? '')
   }

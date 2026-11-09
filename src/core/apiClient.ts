@@ -1,5 +1,5 @@
 import { API_BASE_URL, BUILD, assertApiConfigured } from './config'
-import { getAccessToken, refreshAccessToken } from './auth/tokenStore'
+import { clearTokens, getAccessToken, refreshAccessToken } from './auth/tokenStore'
 
 export interface LumonErrorBody {
   error?: string
@@ -85,9 +85,10 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
       const code = failure && typeof failure === 'object' && 'error' in failure ? String(failure.error) : ''
       if (code === 'TOKEN_EXPIRED') {
         refreshed = true
-        await refreshAccessToken()
-        continue
+        const token = await refreshAccessToken()
+        if (token) continue
       }
+      if (['SESSION_REVOKED', 'REFRESH_REUSED', 'TOKEN_INVALID'].includes(code)) clearTokens()
     }
     if (retry && method === 'GET' && attempt < 3 && [429, 503].includes(response.status)) {
       await response.body?.cancel()
