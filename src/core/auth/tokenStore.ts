@@ -6,7 +6,7 @@ export interface TokenPair {
   expiresIn?: number
 }
 
-type SessionMessage = { type: 'tokens'; tokens: TokenPair } | { type: 'logout' }
+type SessionMessage = { type: 'tokens'; tokens: TokenPair } | { type: 'logout' } | { type: 'request-tokens' }
 const REFRESH_KEY = 'lumon.refresh'
 const LOGOUT_KEY = 'lumon.logout'
 let accessToken: string | null = null
@@ -22,6 +22,7 @@ function readRefresh() {
 }
 export function hasRefreshToken() { return Boolean(readRefresh()) }
 export function getAccessToken() { return accessToken }
+export function getRefreshToken() { return readRefresh() }
 export function subscribeSession(listener: () => void) {
   listeners.add(listener)
   return () => { listeners.delete(listener) }
@@ -44,6 +45,9 @@ export function clearTokens(broadcast = true) {
 channel?.addEventListener('message', (event: MessageEvent<SessionMessage>) => {
   if (event.data?.type === 'tokens') setTokens(event.data.tokens, false)
   if (event.data?.type === 'logout') clearTokens(false)
+  if (event.data?.type === 'request-tokens' && accessToken && readRefresh()) {
+    channel?.postMessage({ type: 'tokens', tokens: { accessToken, refreshToken: readRefresh()! } } satisfies SessionMessage)
+  }
 })
 if (typeof window !== 'undefined') window.addEventListener('storage', event => {
   if (event.key === LOGOUT_KEY && event.newValue) clearTokens(false)
@@ -52,11 +56,23 @@ export async function refreshAccessToken(): Promise<string | null> {
   if (refreshing) return refreshing
   refreshing = (async () => {
     const initialToken = readRefresh()
+    const initialAccess = accessToken
     if (!initialToken) return null
     const rotate = async () => {
       const latest = readRefresh()
       if (!latest) return null
-      if (latest !== initialToken && accessToken) return accessToken
+      if (latest !== initialToken) {
+        if (accessToken && accessToken !== initialAccess) return accessToken
+        channel?.postMessage({ type: 'request-tokens' } satisfies SessionMessage)
+        const synced = await new Promise<string | null>(resolve => {
+          const stop = subscribeSession(() => {
+            if (accessToken && accessToken !== initialAccess && readRefresh() === latest) finish(accessToken)
+          })
+          const timeout = setTimeout(() => finish(null), 1200)
+          function finish(value: string | null) { clearTimeout(timeout); stop(); resolve(value) }
+        })
+        if (synced) return synced
+      }
       const response = await fetch(API_BASE_URL + '/auth/refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Lumon-Build': BUILD },
