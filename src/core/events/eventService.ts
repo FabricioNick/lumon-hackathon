@@ -1,4 +1,4 @@
-import { apiRequest } from '../apiClient'
+import { apiRequest, ApiError } from '../apiClient'
 import { clearTokens } from '../auth/tokenStore'
 import { API_BASE_URL } from '../config'
 
@@ -56,61 +56,35 @@ function sleep(ms: number, signal: AbortSignal) {
     signal.addEventListener('abort', done, { once: true })
   })
 }
-async function consumeStream(ticket: string, signal: AbortSignal) {
-  const url = new URL(API_BASE_URL + '/events/stream')
-  url.searchParams.set('ticket', ticket)
-  if (lastEventId) url.searchParams.set('lastEventId', lastEventId)
-  const controller = new AbortController()
-  const abort = () => controller.abort()
-  signal.addEventListener('abort', abort, { once: true })
-  let lastByte = Date.now()
-  const watchdog = setInterval(() => { if (Date.now() - lastByte > 45000) controller.abort() }, 5000)
-  try {
-    const response = await fetch(url, { headers: { Accept: 'text/event-stream' }, signal: controller.signal })
-    if (!response.ok || !response.body) throw new Error('Stream HTTP ' + response.status)
-    changeStatus('live')
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let pending = ''
-    let type = 'message'
-    let id = ''
-    let data: string[] = []
-    const dispatch = () => {
-      if (data.length) {
-        const text = data.join('\n')
-        let parsed: unknown = text
-        try { parsed = JSON.parse(text) as unknown } catch {}
-        accept({ id, type, data: parsed })
-      }
-      type = 'message'; id = ''; data = []
+function connectStream(ticket: string, signal: AbortSignal) {
+  return new Promise<void>(resolve => {
+    const url = new URL(API_BASE_URL + '/events/stream')
+    url.searchParams.set('ticket', ticket)
+    if (lastEventId) url.searchParams.set('lastEventId', lastEventId)
+    const source = new EventSource(url.toString())
+    let closed = false
+    function close() {
+      if (closed) return
+      closed = true
+      signal.removeEventListener('abort', close)
+      source.close()
+      resolve()
     }
-    while (!signal.aborted) {
-      const { value, done } = await reader.read()
-      if (done) break
-      lastByte = Date.now()
-      pending += decoder.decode(value, { stream: true })
-      let end = pending.indexOf('\n')
-      while (end >= 0) {
-        const line = pending.slice(0, end).replace(/\r$/, '')
-        pending = pending.slice(end + 1)
-        if (!line) dispatch()
-        else if (!line.startsWith(':')) {
-          const colon = line.indexOf(':')
-          const field = colon < 0 ? line : line.slice(0, colon)
-          const value = colon < 0 ? '' : line.slice(colon + 1).replace(/^ /, '')
-          if (field === 'event') type = value
-          if (field === 'id') id = value
-          if (field === 'data') data.push(value)
-        }
-        end = pending.indexOf('\n')
-      }
+    function handle(type: string, message: MessageEvent<string>) {
+      let data: unknown = message.data
+      try { data = JSON.parse(message.data) as unknown } catch {}
+      accept({ type, data, id: message.lastEventId || '' })
+      if (type === 'stream.superseded') close()
     }
-    await reader.cancel().catch(() => undefined)
-  } finally {
-    clearInterval(watchdog)
-    signal.removeEventListener('abort', abort)
-    controller.abort()
-  }
+    source.onopen = () => changeStatus('live')
+    source.onerror = close
+    source.onmessage = event => handle('message', event)
+    for (const type of ['refiner.updated', 'refinement.created', 'file.completed', 'contingency.activated', 'contingency.resolved', 'session.revoked', 'stream.reset', 'stream.superseded']) {
+      source.addEventListener(type, event => handle(type, event as MessageEvent<string>))
+    }
+    signal.addEventListener('abort', close, { once: true })
+    if (signal.aborted) close()
+  })
 }
 async function streamLoop(signal: AbortSignal) {
   let attempt = 0
@@ -122,10 +96,10 @@ async function streamLoop(signal: AbortSignal) {
         ? ('ticket' in response ? response.ticket : 'token' in response ? response.token : null) : null
       if (typeof ticket !== 'string' || !ticket) throw new Error('Ticket SSE inválido.')
       attempt = 0
-      await consumeStream(ticket, signal)
+      await connectStream(ticket, signal)
     } catch (error) {
       if (signal.aborted) break
-      if (error && typeof error === 'object' && 'status' in error && error.status === 423) {
+      if (error instanceof ApiError && error.status === 423) {
         changeStatus('locked')
         await sleep(30000, signal)
         continue
