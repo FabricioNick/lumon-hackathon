@@ -16,3 +16,23 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run lint
+      - name: Public Swagger contract
+        if: always()
+        shell: bash
+        run: |
+          for path in /openapi.json /api/v1/openapi.json /docs-json /swagger.json /api-json /docs/openapi.json; do
+            code=$(curl -sSL --max-time 8 -w '%{http_code}' -o /tmp/lumon-spec.json "https://lumon-api.vercel.app$path" || true)
+            echo "Swagger probe: $path -> $code"
+            if node -e '
+              const fs = require("fs");
+              try {
+                const doc = JSON.parse(fs.readFileSync("/tmp/lumon-spec.json", "utf8"));
+                if (!doc.paths) process.exit(1);
+                console.log("OpenAPI version:", doc.openapi || doc.swagger || "unknown");
+                for (const wanted of ["/auth/register", "/auth/login", "/auth/refresh", "/team/roster", "/integrations/deploy/challenge", "/integrations/deploy/verify", "/clearance/check", "/events/tickets"]) {
+                  const key = Object.keys(doc.paths).find(k => k.endsWith(wanted));
+                  if (key) console.log("CONTRACT", key, JSON.stringify(doc.paths[key]).slice(0, 5000));
+                }
+              } catch { process.exit(1); }
+            '; then break; fi
+          done
