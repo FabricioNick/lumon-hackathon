@@ -98,6 +98,6 @@ Las pruebas con Chrome usan exclusivamente `tests/browser.html`/`browser.jsx` y 
 
 ## Dependencias pendientes
 
-Conectar CP1 (runtime autenticado, permisos y bus), abrir clearance mediante la revisión oficial y disponer del storage verificado. Sin eso no puede declararse una subida ni un ack reales exitosos. No se crearon cuentas ni se intentó eludir clearance. Probar con dos usuarios, dos pestañas y modo caos tras integrar. El entorno de esta ejecución dispone de Node 22.23.2; repetir validación con Node 24 LTS, exigido por el curso.
+Conectar CP1 (runtime autenticado, permisos y bus), abrir clearance mediante la revisión oficial y disponer del storage verificado. Sin eso no puede declararse una subida ni un ack reales exitosos. No se crearon cuentas ni se intentó eludir clearance. Probar con dos usuarios, dos pestañas y modo caos tras integrar. El entorno base dispone de Node 22.23.2. También se validaron build, lint y las 19 pruebas con Node 24.22.2 LTS mediante una instalación temporal, sin cambiar dependencias del repositorio.
 
 Para integrar con main: revisar los commits de esta rama; conservar el router/auth de CP1 y añadir los adaptadores anteriores; resolver únicamente los puntos compartidos de App/Vite/estilos/strict; ejecutar las validaciones y pruebas reales; el equipo decide y realiza el merge a main y despliegue. Esta ejecución no cambia ni fusiona main.
