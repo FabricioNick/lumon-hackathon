@@ -4,11 +4,15 @@ on:
     branches: [main, feat/core-auth-deploy]
   pull_request:
     branches: [main]
+permissions:
+  contents: read
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -16,19 +20,13 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run lint
-      - name: Inspect exact Lumon endpoint contracts
-        shell: bash
+      - name: Enforce initial JavaScript budget
         run: |
-          curl -fsSL --max-time 20 https://lumon-api.vercel.app/openapi.json -o /tmp/spec.json
-          node - <<'NODE'
-          const s = require('/tmp/spec.json')
-          const endpoints = ['/auth/register','/auth/login','/auth/logout','/auth/me','/auth/refresh','/integrations/status','/integrations/deploy/challenge','/integrations/deploy/verify','/clearance','/clearance/status','/clearance/check','/team/roster','/events/tickets','/events/stream','/meta/health','/team/members']
-          for (const end of endpoints) {
-            const entry = Object.entries(s.paths).find(([path])=>path.endsWith(end))
-            if (!entry) { console.log('ENDPOINT', end, 'NOT FOUND'); continue }
-            for (const [method,op] of Object.entries(entry[1])) {
-              console.log('ENDPOINT',end,method.toUpperCase(),JSON.stringify({requestBody:op.requestBody?.content?.['application/json']?.schema,response200:op.responses?.['200']?.content?.['application/json']?.schema,response201:op.responses?.['201']?.content?.['application/json']?.schema,description:op.description?.slice(0,340)}))
-            }
-          }
-          for (const schema of ['RegisterRequest','RegisterResponse','LoginResponse','TokenPair','RefreshRequest','AuthMeResponse','User','RosterRequest','RosterMember','IntegrationStatus','ClearanceStatus','DeployChallenge','EventStreamTicket']) console.log('MODEL',schema,JSON.stringify(s.components.schemas[schema]??'NOT FOUND'))
-          NODE
+          node --input-type=module -e '
+            import fs from "node:fs";
+            import { gzipSync } from "node:zlib";
+            const bundles = fs.readdirSync("dist/assets").filter(name => /^index-.*\.js$/.test(name));
+            const size = bundles.reduce((total, name) => total + gzipSync(fs.readFileSync("dist/assets/" + name)).length, 0);
+            console.log("Initial JavaScript:", size, "bytes gzipped");
+            if (size > 180 * 1024) process.exit(1);
+          '
