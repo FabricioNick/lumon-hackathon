@@ -220,7 +220,9 @@ function AppRoutes() {
             element={
               <RouteBoundary>
                 <Private permission="refiners:read">
-                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}><RefinersPage /></Suspense>
+                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}>
+                    <RefinersPage />
+                  </Suspense>
                 </Private>
               </RouteBoundary>
             }
@@ -230,7 +232,9 @@ function AppRoutes() {
             element={
               <RouteBoundary>
                 <Private permission="refiners:read">
-                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}><RefinerDetailPage /></Suspense>
+                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}>
+                    <RefinerDetailPage />
+                  </Suspense>
                 </Private>
               </RouteBoundary>
             }
@@ -240,7 +244,9 @@ function AppRoutes() {
             element={
               <RouteBoundary>
                 <Private permission={['refiners:read', 'refiners:write', 'media:upload']}>
-                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}><BadgeEditorPage /></Suspense>
+                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}>
+                    <BadgeEditorPage />
+                  </Suspense>
                 </Private>
               </RouteBoundary>
             }
@@ -250,7 +256,9 @@ function AppRoutes() {
             element={
               <RouteBoundary>
                 <Private permission={['refiners:read', 'refiners:write']}>
-                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}><RefinerEditPage /></Suspense>
+                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}>
+                    <RefinerEditPage />
+                  </Suspense>
                 </Private>
               </RouteBoundary>
             }
@@ -260,7 +268,9 @@ function AppRoutes() {
             element={
               <RouteBoundary>
                 <Private permission="incidents:read">
-                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}><IncidentsPage /></Suspense>
+                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}>
+                    <IncidentsPage />
+                  </Suspense>
                 </Private>
               </RouteBoundary>
             }
@@ -270,7 +280,9 @@ function AppRoutes() {
             element={
               <RouteBoundary>
                 <Private permission={['incidents:create', 'media:upload']}>
-                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}><NewIncidentPage /></Suspense>
+                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}>
+                    <NewIncidentPage />
+                  </Suspense>
                 </Private>
               </RouteBoundary>
             }
