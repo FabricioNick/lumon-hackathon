@@ -9,6 +9,7 @@ export interface LumonEvent {
 }
 export type EventConnection = 'offline' | 'connecting' | 'live' | 'locked' | 'reconnecting'
 const callbacks = new Set<(event: LumonEvent) => void>()
+const recentEvents: LumonEvent[] = []
 const statusCallbacks = new Set<() => void>()
 let connection: EventConnection = 'offline'
 let lastEventId = ''
@@ -27,6 +28,7 @@ export function subscribeEventStatus(listener: () => void) {
 }
 export function subscribeEvents(listener: (event: LumonEvent) => void) {
   callbacks.add(listener)
+  for (const event of recentEvents) listener(event)
   return () => {
     callbacks.delete(listener)
   }
@@ -44,7 +46,13 @@ function accept(event: LumonEvent, publish = true) {
     seen.add(event.id)
     if (seen.size > 3000) seen.delete(seen.values().next().value ?? '')
   }
-  if (event.type === 'session.revoked') clearTokens()
+  if (event.type === 'session.revoked') {
+    recentEvents.length = 0
+    clearTokens()
+  } else {
+    recentEvents.push(event)
+    if (recentEvents.length > 100) recentEvents.shift()
+  }
   callbacks.forEach((listener) => listener(event))
   window.dispatchEvent(new CustomEvent('lumon-event', { detail: event }))
   if (publish) channel?.postMessage({ kind: 'event', event })
