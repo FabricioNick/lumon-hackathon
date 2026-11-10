@@ -93,6 +93,11 @@ export function StatusPage() {
   const saveRoster = () => {
     const valid = members.length === 3 && members.every(member => member.name.trim().length >= 3 && /^[A-Za-z0-9-]{1,20}$/.test(member.code.trim()))
     if (!valid) { setMessage('Completa los tres nombres (3 o más caracteres) y los tres códigos alfanuméricos.'); return }
+    const codes = members.map(member => member.code.trim().toUpperCase())
+    if (new Set(codes).size !== 3) {
+      setMessage('Los códigos UTEC de los tres integrantes deben ser diferentes.')
+      return
+    }
     const body = { members: members.map(member => ({ name: member.name.trim(), code: member.code.trim() })) }
     void act(() => apiRequest('/team/roster', { method: 'PUT', body, retry: false }), 'Los tres integrantes quedaron inscritos.')
   }
