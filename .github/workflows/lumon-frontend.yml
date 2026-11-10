@@ -1,8 +1,7 @@
 name: Frontend verification
 on:
   push:
-    branches: [main, feat/core-auth-deploy, fix/full-integration]
-    branches: [main, feat/core-auth-deploy]
+    branches: [main, feat/core-auth-deploy, fix/full-integration, fix/qa-final-desde-main]
   pull_request:
     branches: [main]
 permissions:
