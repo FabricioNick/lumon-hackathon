@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
-import { snapshot, subscribe } from './session'
+import { getAuthSnapshot, subscribeAuth } from '../core/auth/authService'
 export function useSession() {
-  return useSyncExternalStore(subscribe, snapshot)
+ const session = useSyncExternalStore(subscribeAuth, getAuthSnapshot)
+ return { user: session.user, loading: session.status === 'loading', error: session.error }
 }

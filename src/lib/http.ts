@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { config } from './config'
+import { getAccessToken, refreshAccessToken, clearTokens } from '../core/auth/tokenStore'
 
 const errorSchema = z.object({
   error: z.string(),
@@ -40,18 +41,6 @@ export function delay(ms: number, signal?: AbortSignal): Promise<void> {
     signal?.addEventListener('abort', cancel, { once: true })
   })
 }
-let token: string | null = null
-let refresh: (old: string | null) => Promise<void> = async () => {
-  throw new Error('Sesión no disponible.')
-}
-let revoke: (reason: string) => void = () => {}
-export const setAccess = (value: string | null) => {
-  token = value
-}
-export const configureAuth = (renew: typeof refresh, close: typeof revoke) => {
-  refresh = renew
-  revoke = close
-}
 let blockedUntil = 0
 const rateChannel =
   typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('lumon.rate-limit')
@@ -70,7 +59,8 @@ function retryAfter(value: string | null): number {
 async function gate(signal?: AbortSignal) {
   while (blockedUntil > Date.now()) await delay(blockedUntil - Date.now(), signal)
 }
-interface Options {
+export interface Options {
+  headers?: HeadersInit
   method?: string
   body?: unknown
   signal?: AbortSignal
@@ -78,18 +68,14 @@ interface Options {
   public?: boolean
   retry?: boolean
 }
-export async function request<T>(
-  path: string,
-  schema: z.ZodType<T>,
-  options: Options = {},
-): Promise<T> {
+export async function rawRequest(path: string, options: Options = {}): Promise<Response> {
   const retryable =
     options.retry !== false && (!options.method || options.method === 'GET' || !!options.key)
   let refreshed = false
   for (let attempt = 0; ; attempt++) {
     await gate(options.signal)
     options.signal?.throwIfAborted()
-    const usedToken = token
+    const usedToken = getAccessToken()
     let response: Response
     try {
       response = await fetch(`${config.api}${path}`, {
@@ -99,12 +85,13 @@ export async function request<T>(
           AbortSignal.timeout(20000),
         ]),
         headers: {
+          ...Object.fromEntries(new Headers(options.headers)),
           'X-Lumon-Build': config.build,
           ...(!options.public && usedToken ? { Authorization: `Bearer ${usedToken}` } : {}),
           ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
           ...(options.key ? { 'Idempotency-Key': options.key } : {}),
         },
-        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        body: options.body === undefined ? undefined : typeof options.body === 'string' ? options.body : JSON.stringify(options.body),
       })
     } catch (error) {
       if (aborted(error) || !retryable || attempt >= 4) throw error
@@ -131,29 +118,32 @@ export async function request<T>(
     }
     let body: unknown
     try {
-      body = response.status === 204 ? null : await response.json()
+      body = response.status === 204 ? null : await response.clone().json()
     } catch (error) {
       if (!retryable || attempt >= 4 || options.signal?.aborted) throw error
       await delay(500 * 2 ** attempt, options.signal)
       continue
     }
-    if (response.ok) return schema.parse(body)
+    if (response.ok) return response
     const parsed = errorSchema.safeParse(body)
     const code = parsed.success ? parsed.data.error : 'HTTP_ERROR'
     if (!options.public && response.status === 401) {
       if (code === 'TOKEN_EXPIRED' && !refreshed) {
         refreshed = true
-        await refresh(usedToken)
+        if (getAccessToken() === usedToken) await refreshAccessToken()
         continue
       }
-      revoke(code)
+      clearTokens()
     }
-    throw new ApiError(
-      response.status,
-      code,
-      parsed.success ? parsed.data.message : `Error HTTP ${response.status}`,
-      parsed.success ? parsed.data.details : undefined,
-      retryAfter(response.headers.get('Retry-After')),
-    )
+    return response
   }
+}
+export async function request<T>(path: string, schema: z.ZodType<T>, options: Options = {}): Promise<T> {
+  const response = await rawRequest(path, options)
+  const body: unknown = response.status === 204 ? null : await response.json()
+  if (!response.ok) {
+    const parsed = errorSchema.safeParse(body)
+    throw new ApiError(response.status, parsed.success ? parsed.data.error : 'HTTP_ERROR', parsed.success ? parsed.data.message : `Error HTTP ${response.status}`, parsed.success ? parsed.data.details : undefined, retryAfter(response.headers.get('Retry-After')))
+  }
+  return schema.parse(body)
 }

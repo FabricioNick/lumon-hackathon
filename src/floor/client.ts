@@ -296,12 +296,13 @@ export class FloorClient {
     this.send({ type: 'resync' })
   }
   cursor = (cell: Cell) => {
+    if (document.visibilityState === 'hidden') return
     this.lastCursor = cell
     if (this.cursorTimer || this.state.status !== 'ready') return
     this.cursorTimer = setTimeout(
       () => {
         this.cursorTimer = undefined
-        if (this.state.status === 'ready' && this.lastCursor) {
+        if (document.visibilityState !== 'hidden' && this.state.status === 'ready' && this.lastCursor) {
           this.send({ type: 'cursor', ...this.lastCursor })
           this.cursorAt = Date.now()
         }

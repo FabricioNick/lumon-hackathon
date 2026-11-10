@@ -1,3 +1,4 @@
+/* Praise Kier */
 import { memo, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'

@@ -198,7 +198,7 @@ export async function setup(
 }
 export async function login(page: Page, path = '/files/42/refine?r=12&c=12') {
   await page.goto(path)
-  await page.getByLabel('Email').fill('test@example.test')
+  await page.getByLabel('Correo electrónico').fill('test@example.test')
   await page.getByLabel('Contraseña').fill('password')
-  await page.getByRole('button', { name: 'Entrar', exact: true }).click()
+  await page.getByRole('button', { name: 'Ingresar al piso', exact: true }).click()
 }
