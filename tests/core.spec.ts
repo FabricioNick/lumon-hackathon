@@ -147,3 +147,58 @@ test('cross-tab refresh rotates only once and logout closes both tabs within two
   expect(logoutBodies).toEqual([{ refreshToken: rotated.refreshToken }])
   expect(await second.evaluate(() => localStorage.getItem('lumon.refresh'))).toBeNull()
 })
+
+
+test('status supports roster, deploy challenge and verify using Swagger request bodies', async ({ page }) => {
+  const calls: { path: string; method: string; body: unknown }[] = []
+  await page.route('**/api/v1/**', async route => {
+    const req = route.request()
+    const path = new URL(req.url()).pathname.replace('/api/v1', '')
+    const method = req.method()
+    const body = req.postData() ? req.postDataJSON() as unknown : null
+    calls.push({ path, method, body })
+    const json = (data: unknown, status = 200) => route.fulfill({
+      status, contentType: 'application/json', body: JSON.stringify(data)
+    })
+    if (path === '/meta/health') return json({ status: 'UP' })
+    if (path === '/auth/login') return json(pair)
+    if (path === '/auth/me') return json(user)
+    if (path === '/events/tickets') return json({ error: 'CLEARANCE_REQUIRED' }, 403)
+    if (path === '/integrations/status') return json({ deploy: {}, storage: {}, clearance: {} })
+    if (path === '/clearance') return json({ granted: false })
+    if (path === '/team/roster' && method === 'GET') return json({ members: [], complete: false, locked: false })
+    if (path === '/team/roster' && method === 'PUT') return json({ ...(body as object), complete: true, locked: false })
+    if (path === '/integrations/deploy/challenge') return json({
+      origin: 'https://lumon-hackathon.vercel.app',
+      token: 'public-test-challenge',
+      wellKnownPath: '/.well-known/lumon-verification.txt',
+      expiresAt: '2026-11-09T23:59:59Z'
+    })
+    if (path === '/integrations/deploy/verify') return json({ origin: 'https://lumon-hackathon.vercel.app', verified: true })
+    return json({ error: 'NOT_FOUND' }, 404)
+  })
+
+  await page.goto('/login')
+  await page.getByLabel('Correo electrónico').fill('member@example.test')
+  await page.getByLabel('Contraseña').fill('password123')
+  await page.getByRole('button', { name: 'Ingresar al piso' }).click()
+  await page.goto('/estado')
+  await expect(page.getByRole('heading', { name: 'Estado del piso' })).toBeVisible()
+
+  await page.getByLabel('Origen de producción').fill('https://lumon-hackathon.vercel.app')
+  await page.getByRole('button', { name: 'Solicitar challenge' }).click()
+  await expect(page.getByLabel('Token de verificación')).toHaveValue('public-test-challenge')
+  expect(calls.find(x => x.path === '/integrations/deploy/challenge')?.body).toEqual({
+    origin: 'https://lumon-hackathon.vercel.app'
+  })
+  await page.getByRole('button', { name: 'Verificar dominio' }).click()
+  await expect.poll(() => calls.filter(x => x.path === '/integrations/deploy/verify').length).toBe(1)
+
+  for (let i = 0; i < roster.members.length; i++) {
+    await page.getByPlaceholder('Nombre y apellido').nth(i).fill(roster.members[i].name)
+    await page.getByPlaceholder('Código').nth(i).fill(roster.members[i].code)
+  }
+  await page.getByRole('button', { name: 'Inscribir integrantes' }).click()
+  await expect.poll(() => calls.filter(x => x.path === '/team/roster' && x.method === 'PUT').length).toBe(1)
+  expect(calls.find(x => x.path === '/team/roster' && x.method === 'PUT')?.body).toEqual({ members: roster.members })
+})
