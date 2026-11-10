@@ -74,6 +74,7 @@ export async function setup(
     calls.push({ path, time: Date.now(), key: req.headers()['idempotency-key'], body })
     const json = (data: unknown, status = 200, headers = {}) =>
       route.fulfill({ status, json: data, headers })
+    if (path === '/meta/health') return json({ status: 'UP' })
     if (path === '/auth/login' || path === '/auth/refresh')
       return json({ accessToken: 'test-access', refreshToken: 'test-refresh', expiresIn: 180 })
     if (path === '/auth/me') return json(me)
@@ -198,7 +199,7 @@ export async function setup(
 }
 export async function login(page: Page, path = '/files/42/refine?r=12&c=12') {
   await page.goto(path)
-  await page.getByLabel('Email').fill('test@example.test')
+  await page.getByLabel(/Correo electrónico|Email/i).fill('test@example.test')
   await page.getByLabel('Contraseña').fill('password')
-  await page.getByRole('button', { name: 'Entrar', exact: true }).click()
+  await page.getByRole('button', { name: /Ingresar al piso|Entrar/i }).click()
 }
