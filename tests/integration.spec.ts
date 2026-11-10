@@ -58,6 +58,9 @@ test('unified direct routes retain query, use permissions and render untrusted f
   page.on('pageerror', (error) => errors.push(error.message))
   await login(page, '/refiners/7?from=directory')
   await expect(page).toHaveURL(/\/refiners\/7\?from=directory$/)
+  await expect(page.getByRole('link', { name: 'LUMON INDUSTRIES', exact: true })).toHaveClass(
+    'brand',
+  )
   await expect(page.getByRole('heading', { name: refiner.fullName })).toBeVisible()
   await expect(page.locator('a[href^="javascript:"]')).toHaveCount(0)
   await page.getByRole('link', { name: 'Personal', exact: true }).click()
