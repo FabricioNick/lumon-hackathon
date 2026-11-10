@@ -182,6 +182,7 @@ test('status supports roster, deploy challenge and verify using Swagger request 
   await page.getByLabel('Correo electrónico').fill('member@example.test')
   await page.getByLabel('Contraseña').fill('password123')
   await page.getByRole('button', { name: 'Ingresar al piso' }).click()
+  await expect(page).toHaveURL('/')
   await page.goto('/estado')
   await expect(page.getByRole('heading', { name: 'Estado del piso' })).toBeVisible()
 
