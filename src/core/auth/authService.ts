@@ -102,7 +102,17 @@ async function startSession(
   if (!isTokenPair(result)) throw new Error('Lumon no devolvió un par válido de tokens.')
   update({ status: 'loading', user: null, error: null })
   setTokens(result)
-  await loadProfile()
+  try {
+    await loadProfile()
+  } catch (error) {
+    clearTokens()
+    update({
+      status: 'anonymous',
+      user: null,
+      error: error instanceof Error ? error.message : 'No se pudo cargar el perfil.',
+    })
+    throw error
+  }
 }
 export function login(body: LoginPayload) {
   return startSession('/auth/login', body)
