@@ -146,7 +146,7 @@ test('simultaneous expired status requests trigger exactly one refresh and retry
   expect(refresh?.body).toEqual({ refreshToken: 'refresh-1' })
 })
 
-test('cross-tab refresh rotates only once and logout closes both tabs within two seconds', async ({
+test('cross-tab session adopts existing access without rotation and logout closes both tabs within two seconds', async ({
   context,
 }) => {
   let refreshCount = 0
@@ -192,11 +192,11 @@ test('cross-tab refresh rotates only once and logout closes both tabs within two
   const second = await context.newPage()
   await second.goto('/estado')
   await expect(second.getByRole('heading', { name: 'Estado del piso' })).toBeVisible()
-  expect(refreshCount).toBe(1)
+  expect(refreshCount).toBe(0)
 
   await first.getByRole('button', { name: 'Salir' }).click()
   await expect(first).toHaveURL(/\/login/)
   await expect(second).toHaveURL(/\/login/, { timeout: 2000 })
-  expect(logoutBodies).toEqual([{ refreshToken: rotated.refreshToken }])
+  expect(logoutBodies).toEqual([{ refreshToken: pair.refreshToken }])
   expect(await second.evaluate(() => localStorage.getItem('lumon.refresh'))).toBeNull()
 })
