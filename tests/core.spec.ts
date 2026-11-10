@@ -110,6 +110,7 @@ test('cross-tab refresh rotates only once and logout closes both tabs within two
     })
     if (path === '/meta/health') return json({ status: 'UP' })
     if (path === '/auth/login') return json(pair)
+    if (path === '/auth/refresh') return json(rotated)
     if (path === '/auth/me') return json(user)
     if (path === '/auth/refresh') {
       refreshCount++
