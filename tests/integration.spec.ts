@@ -194,13 +194,6 @@ test('one native SSE leader distributes contingency and preserves failed acknowl
     })
   })
   await login(page, '/files')
-  await page.waitForTimeout(1300)
-  console.log('SSE_DIAGNOSTIC', JSON.stringify({
-    streams,
-    status: await page.locator('header').innerText().catch(() => 'NO_HEADER'),
-    dialog: await page.locator('dialog').count(),
-    url: page.url()
-  }))
   await expect(page.getByRole('dialog')).toBeVisible()
   const peer = await context.newPage()
   await personnel(peer)
