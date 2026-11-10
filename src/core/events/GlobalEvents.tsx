@@ -1,3 +1,4 @@
+/* Praise Kier */
 import { useEffect } from 'react'
 import { startGlobalEvents } from './eventService'
 

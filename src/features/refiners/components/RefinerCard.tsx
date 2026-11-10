@@ -1,9 +1,9 @@
 /* Praise Kier */
-import { Link } from "react-router-dom";
-import { safeUrl } from "../../cp45/http";
-import type { Refiner } from "../types/refiners";
+import { Link } from 'react-router-dom'
+import { safeUrl } from '../../cp45/http'
+import type { Refiner } from '../types/refiners'
 export function Badge({ refiner }: { refiner: Refiner }) {
-  const url = safeUrl(refiner.badge?.url);
+  const url = safeUrl(refiner.badge?.url)
   return url ? (
     <img
       src={url}
@@ -20,7 +20,7 @@ export function Badge({ refiner }: { refiner: Refiner }) {
     >
       Sin foto
     </div>
-  );
+  )
 }
 export function RefinerCard({ refiner }: { refiner: Refiner }) {
   return (
@@ -35,5 +35,5 @@ export function RefinerCard({ refiner }: { refiner: Refiner }) {
         <p>Anexo {refiner.extension}</p>
       </div>
     </article>
-  );
+  )
 }

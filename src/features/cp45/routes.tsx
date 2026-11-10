@@ -1,9 +1,9 @@
 /* Praise Kier */
-import { Suspense } from "react";
-import { Link, Outlet, useRoutes } from "react-router-dom";
-import { createCp45Routes } from "./routeDefinitions";
-import { ContingencyModal } from "../contingency/ContingencyModal";
-import "./styles.css";
+import { Suspense } from 'react'
+import { Link, Outlet, useRoutes } from 'react-router-dom'
+import { createCp45Routes } from './routeDefinitions'
+import { ContingencyModal } from '../contingency/ContingencyModal'
+import './styles.css'
 export function Cp45Layout() {
   return (
     <div className="cp45 min-h-screen bg-slate-50 text-slate-900">
@@ -26,7 +26,7 @@ export function Cp45Layout() {
       </main>
       <ContingencyModal />
     </div>
-  );
+  )
 }
 export function Cp45Router() {
   return useRoutes([
@@ -35,7 +35,7 @@ export function Cp45Router() {
       children: [
         ...createCp45Routes(),
         {
-          path: "*",
+          path: '*',
           element: (
             <>
               <h1 className="text-3xl font-semibold">Personal de Lumon</h1>
@@ -46,5 +46,5 @@ export function Cp45Router() {
         },
       ],
     },
-  ]);
+  ])
 }

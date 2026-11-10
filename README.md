@@ -1,3 +1,11 @@
+## Ejecutar la consola integrada
+
+Requiere Node 24 y npm. Ejecutar `npm ci`, copiar `.env.example` a `.env`, configurar las URLs de API/WebSocket y las variables públicas del proveedor de storage, y ejecutar `npm run dev`. Para producción: `npm run build`; Vercel usa `vercel.json` y el SHA del commit. Registrar y verificar dominio/storage desde `/estado`. Nunca configurar claves secretas.
+
+Validación: `npm run lint`, `npm run format:check`, `npm run test:unit` y `npm test` (instalar Chromium con `npx playwright install chromium`). [Arquitectura y límites de validación](docs/INTEGRATION.md). Los integrantes y la URL real de producción siguen pendientes en `hackathon.json`.
+
+---
+
 # Hackathon Frontend: Lumon Industries — Macrodata Refinement
 
 <div align="center">

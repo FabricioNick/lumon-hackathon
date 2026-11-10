@@ -1,3 +1,4 @@
+/* Praise Kier */
 import { memo, useSyncExternalStore } from 'react'
 import type { FloorClient } from './client'
 import { CELL } from '../files/VirtualGrid'

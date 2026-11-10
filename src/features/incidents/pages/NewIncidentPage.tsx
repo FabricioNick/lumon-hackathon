@@ -1,7 +1,7 @@
 /* Praise Kier */
-import { Link } from "react-router-dom";
-import { Permission } from "../../cp45/runtime";
-import { IncidentForm } from "../components/IncidentForm";
+import { Link } from 'react-router-dom'
+import { Permission } from '../../cp45/runtime'
+import { IncidentForm } from '../components/IncidentForm'
 export default function NewIncidentPage() {
   return (
     <Permission name="incidents:create">
@@ -11,5 +11,5 @@ export default function NewIncidentPage() {
         <IncidentForm />
       </Permission>
     </Permission>
-  );
+  )
 }

@@ -1,3 +1,5 @@
+/* Praise Kier */
+import { subscribeEvents } from '../core/events/eventService'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { DragEvent, PointerEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
@@ -152,8 +154,25 @@ function Console({
       }
       if (!controller.signal.aborted) timer = setTimeout(() => void sync(), 15000)
     }
+    const unsubscribe = subscribeEvents((event) => {
+      const data = event.data
+      if (
+        event.type === 'stream.reset' ||
+        (['refinement.created', 'file.completed'].includes(event.type) &&
+          data &&
+          typeof data === 'object' &&
+          'fileId' in data &&
+          data.fileId === initial.id)
+      ) {
+        store.invalidate()
+        cancel()
+        clearTimeout(timer)
+        void sync()
+      }
+    })
     timer = setTimeout(() => void sync(), 15000)
     return () => {
+      unsubscribe()
       controller.abort()
       clearTimeout(timer)
     }

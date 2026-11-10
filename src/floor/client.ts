@@ -36,6 +36,7 @@ export class FloorClient {
   private cursorAt = 0
   private cursorTimer: ReturnType<typeof setTimeout> | undefined
   private lastCursor: Cell | null = null
+  private reconnectSeed: Cell | null = null
   private stateListeners = new Set<() => void>()
   private cursorListeners = new Set<() => void>()
   private cursors: Member[] = []
@@ -150,6 +151,10 @@ export class FloorClient {
               claims,
               own: claims.some((c) => c.claimId === this.state.own) ? this.state.own : null,
             })
+            const seed = this.reconnectSeed
+            this.reconnectSeed = null
+            if (seed)
+              void this.reserve(seed).catch((error) => this.update({ message: message(error) }))
             return
           }
           if ('seq' in data && data.seq !== undefined) {
@@ -238,6 +243,8 @@ export class FloorClient {
       socket.onclose = (event) => {
         clearInterval(this.heartbeat)
         if (socket !== this.socket || this.disposed) return
+        this.reconnectSeed =
+          this.state.claims.find((claim) => claim.claimId === this.state.own)?.cells[0] ?? null
         this.socket = null
         this.seq = null
         this.rejectPending(new Error('Se perdió la conexión al piso. Puedes reintentar por HTTP.'))
@@ -296,12 +303,17 @@ export class FloorClient {
     this.send({ type: 'resync' })
   }
   cursor = (cell: Cell) => {
+    if (document.visibilityState === 'hidden') return
     this.lastCursor = cell
     if (this.cursorTimer || this.state.status !== 'ready') return
     this.cursorTimer = setTimeout(
       () => {
         this.cursorTimer = undefined
-        if (this.state.status === 'ready' && this.lastCursor) {
+        if (
+          document.visibilityState !== 'hidden' &&
+          this.state.status === 'ready' &&
+          this.lastCursor
+        ) {
           this.send({ type: 'cursor', ...this.lastCursor })
           this.cursorAt = Date.now()
         }
@@ -351,6 +363,7 @@ export class FloorClient {
     pending.reject(error)
   }
   release = () => {
+    this.reconnectSeed = null
     this.rejectPending(new Error('Reserva cancelada.'))
     if (this.state.own) this.send({ type: 'release', claimId: this.state.own })
     this.update({
