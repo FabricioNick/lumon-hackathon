@@ -19,7 +19,7 @@ export function Layout({ children }: { children?: ReactNode }) {
   return (
     <>
       <header className="site-header">
-        <Link to="/" className="brand" aria-label="Lumon, inicio">
+        <Link to="/" className="brand" aria-label="LUMON INDUSTRIES">
           <span className="brand-mark">L</span>
           <span>
             LUMON <small>INDUSTRIES</small>
