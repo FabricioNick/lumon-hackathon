@@ -1,0 +1,35 @@
+[
+  {
+    "route": "login",
+    "url": "http://127.0.0.1:5190/login",
+    "heading": "Bienvenido de regreso",
+    "lighthouseVersion": "12.8.2",
+    "mode": "snapshot",
+    "session": "fixture (no backend account)",
+    "score": 100,
+    "labelContentNameMismatch": null,
+    "failed": []
+  },
+  {
+    "route": "files",
+    "url": "http://127.0.0.1:5190/files?page=0&size=10&sort=updatedAt%2Cdesc",
+    "heading": "Archivos de macrodatos",
+    "lighthouseVersion": "12.8.2",
+    "mode": "snapshot",
+    "session": "fixture (no backend account)",
+    "score": 100,
+    "labelContentNameMismatch": null,
+    "failed": []
+  },
+  {
+    "route": "refiners",
+    "url": "http://127.0.0.1:5190/refiners",
+    "heading": "Directorio de refinadores",
+    "lighthouseVersion": "12.8.2",
+    "mode": "snapshot",
+    "session": "fixture (no backend account)",
+    "score": 100,
+    "labelContentNameMismatch": null,
+    "failed": []
+  }
+]

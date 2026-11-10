@@ -1,8 +1,7 @@
 name: Frontend verification
 on:
   push:
-    branches: [main, feat/core-auth-deploy, fix/full-integration]
-    branches: [main, feat/core-auth-deploy]
+    branches: [main, feat/core-auth-deploy, fix/full-integration, fix/qa-final-desde-main]
   pull_request:
     branches: [main]
 permissions:
@@ -26,12 +25,4 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm test
       - name: Enforce initial JavaScript budget
-        run: |
-          node --input-type=module -e '
-            import fs from "node:fs";
-            import { gzipSync } from "node:zlib";
-            const bundles = fs.readdirSync("dist/assets").filter(name => /^index-.*\.js$/.test(name));
-            const size = bundles.reduce((total, name) => total + gzipSync(fs.readFileSync("dist/assets/" + name)).length, 0);
-            console.log("Initial JavaScript:", size, "bytes gzipped");
-            if (size > 180 * 1024) process.exit(1);
-          '
+        run: node scripts/check-bundle.mjs
