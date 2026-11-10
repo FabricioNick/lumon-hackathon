@@ -27,7 +27,7 @@ function FeaturePage({ modulePath, label }: { modulePath: string; label: string 
   return <Suspense fallback={<p className="panel">Cargando {label}…</p>}><Component /></Suspense>
 }
 
-function Private({ children, permission }: { children: React.ReactNode; permission?: string }) {
+function Private({ children, permission }: { children: React.ReactNode; permission?: string | string[] }) {
   const session = useSyncExternalStore(subscribeAuth, getAuthSnapshot)
   const location = useLocation()
   if (session.status === 'loading') return <Loading />
@@ -35,8 +35,10 @@ function Private({ children, permission }: { children: React.ReactNode; permissi
     const next = encodeURIComponent(location.pathname + location.search)
     return <Navigate to={'/login?next=' + next} replace />
   }
-  if (permission && !session.user?.permissions?.includes(permission)) return (
-    <section className="panel"><h1>Sin permiso</h1><p>Tu rol no tiene el permiso {permission}.</p><Link to="/">Volver al inicio</Link></section>
+  const required = typeof permission === 'string' ? [permission] : (permission ?? [])
+  const missing = required.find(name => !session.user?.permissions?.includes(name))
+  if (missing) return (
+    <section className="panel"><h1>Sin permiso</h1><p>Tu usuario no tiene el permiso {missing}.</p><Link to="/">Volver al inicio</Link></section>
   )
   return <>{children}</>
 }
@@ -107,13 +109,13 @@ function AppRoutes() {
         <Route index element={<RouteBoundary><Home /></RouteBoundary>} />
         <Route path="/estado" element={<RouteBoundary><StatusPage /></RouteBoundary>} />
         <Route path="/files" element={<RouteBoundary><Private permission="files:read"><Suspense fallback={<p className="panel">Cargando archivos…</p>}><FilesPage /></Suspense></Private></RouteBoundary>} />
-        <Route path="/files/:id/refine" element={<RouteBoundary><Private permission="files:refine"><Suspense fallback={<p className="panel">Cargando refinamiento…</p>}><RefinePage /></Suspense></Private></RouteBoundary>} />
+        <Route path="/files/:id/refine" element={<RouteBoundary><Private permission="files:read"><Suspense fallback={<p className="panel">Cargando refinamiento…</p>}><RefinePage /></Suspense></Private></RouteBoundary>} />
         <Route path="/refiners" element={<RouteBoundary><Private permission="refiners:read"><FeaturePage modulePath="../features/refiners/pages/RefinersPage.tsx" label="Expedientes" /></Private></RouteBoundary>} />
         <Route path="/refiners/:id" element={<RouteBoundary><Private permission="refiners:read"><FeaturePage modulePath="../features/refiners/pages/RefinerDetailPage.tsx" label="Expediente" /></Private></RouteBoundary>} />
-        <Route path="/refiners/:id/badge" element={<RouteBoundary><Private permission="media:upload"><FeaturePage modulePath="../features/refiners/pages/BadgeEditorPage.tsx" label="Fotocheck" /></Private></RouteBoundary>} />
-        <Route path="/refiners/:id/edit" element={<RouteBoundary><Private permission="refiners:write"><FeaturePage modulePath="../features/refiners/pages/RefinerEditPage.tsx" label="Editar expediente" /></Private></RouteBoundary>} />
+        <Route path="/refiners/:id/badge" element={<RouteBoundary><Private permission={['refiners:read', 'refiners:write', 'media:upload']}><FeaturePage modulePath="../features/refiners/pages/BadgeEditorPage.tsx" label="Fotocheck" /></Private></RouteBoundary>} />
+        <Route path="/refiners/:id/edit" element={<RouteBoundary><Private permission={['refiners:read', 'refiners:write']}><FeaturePage modulePath="../features/refiners/pages/RefinerEditPage.tsx" label="Editar expediente" /></Private></RouteBoundary>} />
         <Route path="/incidents" element={<RouteBoundary><Private permission="incidents:read"><FeaturePage modulePath="../features/incidents/pages/IncidentsPage.tsx" label="Incidencias" /></Private></RouteBoundary>} />
-        <Route path="/incidents/new" element={<RouteBoundary><Private permission="incidents:create"><FeaturePage modulePath="../features/incidents/pages/NewIncidentPage.tsx" label="Nueva incidencia" /></Private></RouteBoundary>} />
+        <Route path="/incidents/new" element={<RouteBoundary><Private permission={['incidents:create', 'media:upload']}><FeaturePage modulePath="../features/incidents/pages/NewIncidentPage.tsx" label="Nueva incidencia" /></Private></RouteBoundary>} />
         <Route path="*" element={<section className="panel"><h1>404 · Archivo no encontrado</h1><Link to="/">Regresar</Link></section>} />
       </Route>
     </Routes>
