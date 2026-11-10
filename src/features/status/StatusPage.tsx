@@ -147,6 +147,10 @@ export function StatusPage() {
       setMessage('Completa los tres nombres (3 o más caracteres) y los tres códigos alfanuméricos.')
       return
     }
+    if (new Set(members.map((member) => member.code.trim().toLowerCase())).size !== 3) {
+      setMessage('Los códigos de los tres integrantes deben ser únicos.')
+      return
+    }
     const body = {
       members: members.map((member) => ({ name: member.name.trim(), code: member.code.trim() })),
     }
@@ -241,7 +245,7 @@ export function StatusPage() {
                   )
                 const body =
                   storage.provider === 'SUPABASE'
-                    ? { ...storage, bucket: import.meta.env.VITE_SUPABASE_BUCKET }
+                    ? { ...storage, bucket: 'lumon-media' }
                     : {
                         provider: storage.provider,
                         cloudName: storage.cloudName,

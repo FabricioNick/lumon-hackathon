@@ -208,3 +208,50 @@ test('cross-tab refresh rotates only once and logout closes both tabs within two
   expect(logoutBodies).toEqual([{ refreshToken: rotated.refreshToken }])
   expect(await second.evaluate(() => localStorage.getItem('lumon.refresh'))).toBeNull()
 })
+
+test('status submits real contract shapes, rejects duplicate roster codes and shows storage setup pending', async ({
+  page,
+}) => {
+  const network = await mockLumon(page)
+  const writes: { path: string; body: unknown }[] = []
+  await page.route('**/integrations/deploy/*', async (route) => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    writes.push({ path, body: request.postData() ? request.postDataJSON() : null })
+    await route.fulfill({
+      json: path.endsWith('/challenge')
+        ? {
+            token: 'fixture-public-challenge',
+            wellKnownPath: '/.well-known/lumon-verification.txt',
+            expiresAt: '2099-01-01T00:00:00Z',
+          }
+        : { verified: true },
+    })
+  })
+  await page.goto('/login?next=%2Festado')
+  await page.getByLabel('Correo electrónico').fill('member@example.test')
+  await page.getByLabel('Contraseña').fill('password123')
+  await page.getByRole('button', { name: 'Ingresar al piso' }).click()
+  await expect(page.getByLabel('Integrante 1')).toHaveValue('Estudiante Uno')
+  await page.getByLabel('Código UTEC').nth(1).fill('a001')
+  await page.getByRole('button', { name: 'Inscribir integrantes' }).click()
+  await expect(page.getByRole('status')).toContainText('deben ser únicos')
+  expect(network.requests.filter((r) => r.method === 'PUT')).toHaveLength(0)
+  await page.getByRole('button', { name: 'Verificar storage configurado' }).click()
+  await expect(page.getByRole('status')).toContainText('Configura las variables públicas')
+  await page.getByLabel('Origen de producción').fill('https://fixture.example.test/path')
+  await page.getByRole('button', { name: 'Solicitar challenge' }).click()
+  await expect(page.getByRole('status')).toContainText('origen HTTPS sin rutas')
+  expect(writes).toHaveLength(0)
+  await page.getByLabel('Origen de producción').fill('https://fixture.example.test')
+  await page.getByRole('button', { name: 'Solicitar challenge' }).click()
+  await expect(page.getByLabel('Token de verificación')).toHaveValue('fixture-public-challenge')
+  expect(writes[0]).toEqual({
+    path: '/api/v1/integrations/deploy/challenge',
+    body: { origin: 'https://fixture.example.test' },
+  })
+  await page.getByRole('button', { name: 'Verificar dominio' }).click()
+  await expect.poll(() => writes.length).toBe(2)
+  expect(writes[1]).toEqual({ path: '/api/v1/integrations/deploy/verify', body: null })
+  await expect(page.getByRole('button', { name: 'Abrir el Piso de Pruebas' })).toBeDisabled()
+})
