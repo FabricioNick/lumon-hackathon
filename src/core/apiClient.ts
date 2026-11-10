@@ -70,6 +70,7 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
   const { auth = true, retry = true, body, ...init } = options
   const method = (init.method ?? 'GET').toUpperCase()
   const url = /^https?:\/\//.test(path) ? path : `${API_BASE_URL}${path.startsWith('/') ? path : '/' + path}`
+  if (new URL(url).origin !== new URL(API_BASE_URL).origin) throw new Error('El cliente HTTP solo admite la API de Lumon.')
   let refreshed = false
   for (let attempt = 0; ; attempt++) {
     const headers = new Headers(init.headers)
@@ -87,6 +88,7 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
         refreshed = true
         const token = await refreshAccessToken()
         if (token) continue
+        clearTokens()
       }
       if (['SESSION_REVOKED', 'REFRESH_REUSED', 'TOKEN_INVALID'].includes(code)) clearTokens()
     }
