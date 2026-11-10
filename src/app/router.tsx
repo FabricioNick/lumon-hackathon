@@ -3,12 +3,13 @@ import type { ComponentType } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { getAuthSnapshot, restoreAuth, subscribeAuth } from '../core/auth/authService'
 import { apiRequest } from '../core/apiClient'
-import { Layout } from '../components/Layout'
 import { RouteBoundary } from '../components/RouteBoundary'
 import { AuthPage } from '../features/auth/AuthPage'
 import { StatusPage } from '../features/status/StatusPage'
 
-const GlobalEvents = lazy(() => import('../core/events/GlobalEvents'))
+const CoreIntegration = lazy(() => import('../integrations/CoreIntegration'))
+const FilesPage = lazy(() => import('../files/FilesPage'))
+const RefinePage = lazy(() => import('../files/RefinePage'))
 const modules = import.meta.glob<{ default: ComponentType }>('../features/**/pages/*Page.tsx')
 
 function FeaturePage({ modulePath, label }: { modulePath: string; label: string }) {
@@ -102,12 +103,13 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<AuthPage mode="login" />} />
       <Route path="/register" element={<AuthPage mode="register" />} />
-      <Route element={<Private><Layout><Suspense fallback={null}><GlobalEvents /></Suspense></Layout></Private>}>
+      <Route element={<Private><Suspense fallback={<Loading />}><CoreIntegration /></Suspense></Private>}>
         <Route index element={<RouteBoundary><Home /></RouteBoundary>} />
         <Route path="/estado" element={<RouteBoundary><StatusPage /></RouteBoundary>} />
-        <Route path="/files" element={<RouteBoundary><Private permission="files:read"><FeaturePage modulePath="../features/files/pages/FilesPage.tsx" label="Archivos" /></Private></RouteBoundary>} />
-        <Route path="/files/:id/refine" element={<RouteBoundary><Private permission="files:refine"><FeaturePage modulePath="../features/files/pages/RefinePage.tsx" label="Refinamiento" /></Private></RouteBoundary>} />
+        <Route path="/files" element={<RouteBoundary><Private permission="files:read"><Suspense fallback={<p className="panel">Cargando archivos…</p>}><FilesPage /></Suspense></Private></RouteBoundary>} />
+        <Route path="/files/:id/refine" element={<RouteBoundary><Private permission="files:refine"><Suspense fallback={<p className="panel">Cargando refinamiento…</p>}><RefinePage /></Suspense></Private></RouteBoundary>} />
         <Route path="/refiners" element={<RouteBoundary><Private permission="refiners:read"><FeaturePage modulePath="../features/refiners/pages/RefinersPage.tsx" label="Expedientes" /></Private></RouteBoundary>} />
+        <Route path="/refiners/:id" element={<RouteBoundary><Private permission="refiners:read"><FeaturePage modulePath="../features/refiners/pages/RefinerDetailPage.tsx" label="Expediente" /></Private></RouteBoundary>} />
         <Route path="/refiners/:id/badge" element={<RouteBoundary><Private permission="media:upload"><FeaturePage modulePath="../features/refiners/pages/BadgeEditorPage.tsx" label="Fotocheck" /></Private></RouteBoundary>} />
         <Route path="/refiners/:id/edit" element={<RouteBoundary><Private permission="refiners:write"><FeaturePage modulePath="../features/refiners/pages/RefinerEditPage.tsx" label="Editar expediente" /></Private></RouteBoundary>} />
         <Route path="/incidents" element={<RouteBoundary><Private permission="incidents:read"><FeaturePage modulePath="../features/incidents/pages/IncidentsPage.tsx" label="Incidencias" /></Private></RouteBoundary>} />

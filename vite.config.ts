@@ -13,5 +13,5 @@ function buildSha(command: string) {
 
 export default defineConfig(({ command }) => ({
   plugins: [react(), tailwindcss()],
-  define: { __LUMON_BUILD__: JSON.stringify(buildSha(command)) }
+  define: { __LUMON_BUILD__: JSON.stringify(buildSha(command)), 'import.meta.env.VITE_BUILD_SHA': JSON.stringify(buildSha(command)) }
 }))
