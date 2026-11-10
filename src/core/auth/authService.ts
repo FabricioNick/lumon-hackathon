@@ -1,5 +1,5 @@
 import { apiRequest } from '../apiClient'
-import { clearTokens, getAccessToken, getRefreshToken, hasRefreshToken, isTokenPair, refreshAccessToken, setTokens, subscribeSession } from './tokenStore'
+import { clearTokens, getAccessToken, getRefreshToken, hasRefreshToken, isTokenPair, refreshAccessToken, setTokens, subscribeSession, withRefreshLock } from './tokenStore'
 
 export interface LumonUser {
   id?: number | string
@@ -67,12 +67,26 @@ async function startSession(path: '/auth/login' | '/auth/register', body: LoginP
 export function login(body: LoginPayload) { return startSession('/auth/login', body) }
 export function register(body: RegisterPayload) { return startSession('/auth/register', body) }
 export async function logout() {
-  const refreshToken = getRefreshToken()
   try {
-    if (refreshToken) await apiRequest<void>('/auth/logout', { method: 'POST', body: { refreshToken }, auth: false, retry: false })
+    await withRefreshLock(async () => {
+      const refreshToken = getRefreshToken()
+      try {
+        if (refreshToken) await apiRequest<void>('/auth/logout', {
+          method: 'POST',
+          body: { refreshToken },
+          auth: false,
+          retry: false
+        })
+      } finally {
+        clearTokens()
+        update({ status: 'anonymous', user: null, error: null })
+      }
+    })
   } finally {
-    clearTokens()
-    update({ status: 'anonymous', user: null, error: null })
+    if (snapshot.status !== 'anonymous') {
+      clearTokens()
+      update({ status: 'anonymous', user: null, error: null })
+    }
   }
 }
 subscribeSession(() => {
