@@ -12,15 +12,21 @@ import { subscribeEvents } from '../core/events/eventService'
 import '../features/cp45/styles.css'
 
 async function request(path: string, init: RequestInit = {}): Promise<Response> {
-  const url = /^https?:\/\//.test(path) ? path : API_BASE_URL + (path.startsWith('/') ? path : '/' + path)
+  const url = /^https?:\/\//.test(path)
+    ? path
+    : API_BASE_URL + (path.startsWith('/') ? path : '/' + path)
   const headers = new Headers(init.headers)
   headers.set('X-Lumon-Build', BUILD)
   const access = getAccessToken()
   if (access) headers.set('Authorization', 'Bearer ' + access)
   let response = await fetch(url, { ...init, headers })
   if (response.status === 401) {
-    const payload: unknown = await response.clone().json().catch(() => null)
-    const code = payload && typeof payload === 'object' && 'error' in payload ? String(payload.error) : ''
+    const payload: unknown = await response
+      .clone()
+      .json()
+      .catch(() => null)
+    const code =
+      payload && typeof payload === 'object' && 'error' in payload ? String(payload.error) : ''
     if (code === 'TOKEN_EXPIRED') {
       const renewed = await refreshAccessToken()
       if (renewed) {
@@ -34,23 +40,42 @@ async function request(path: string, init: RequestInit = {}): Promise<Response> 
 
 function storage(): StorageConfig | undefined {
   const env = import.meta.env
-  if (env.VITE_STORAGE_PROVIDER === 'SUPABASE' && env.VITE_SUPABASE_URL && env.VITE_SUPABASE_PUBLIC_KEY) {
-    return { provider: 'SUPABASE', projectUrl: env.VITE_SUPABASE_URL, publicKey: env.VITE_SUPABASE_PUBLIC_KEY }
+  if (
+    env.VITE_STORAGE_PROVIDER === 'SUPABASE' &&
+    env.VITE_SUPABASE_URL &&
+    env.VITE_SUPABASE_PUBLIC_KEY
+  ) {
+    return {
+      provider: 'SUPABASE',
+      projectUrl: env.VITE_SUPABASE_URL,
+      publicKey: env.VITE_SUPABASE_PUBLIC_KEY,
+    }
   }
-  if (env.VITE_STORAGE_PROVIDER === 'CLOUDINARY' && env.VITE_CLOUDINARY_CLOUD_NAME && env.VITE_CLOUDINARY_UPLOAD_PRESET && env.VITE_CLOUDINARY_UPLOAD_URL) {
+  if (
+    env.VITE_STORAGE_PROVIDER === 'CLOUDINARY' &&
+    env.VITE_CLOUDINARY_CLOUD_NAME &&
+    env.VITE_CLOUDINARY_UPLOAD_PRESET &&
+    env.VITE_CLOUDINARY_UPLOAD_URL
+  ) {
     return {
       provider: 'CLOUDINARY',
       cloudName: env.VITE_CLOUDINARY_CLOUD_NAME,
       uploadPreset: env.VITE_CLOUDINARY_UPLOAD_PRESET,
-      uploadUrl: env.VITE_CLOUDINARY_UPLOAD_URL
+      uploadUrl: env.VITE_CLOUDINARY_UPLOAD_URL,
     }
   }
   return undefined
 }
 
 function subscribe(listener: (event: FloorEvent) => void) {
-  return subscribeEvents(event => {
-    const names = ['refiner.updated', 'contingency.activated', 'contingency.resolved', 'stream.reset', 'session.revoked']
+  return subscribeEvents((event) => {
+    const names = [
+      'refiner.updated',
+      'contingency.activated',
+      'contingency.resolved',
+      'stream.reset',
+      'session.revoked',
+    ]
     if (!names.includes(event.type)) return
     listener({ type: event.type, eventId: Number(event.id) || 0, data: event.data } as FloorEvent)
   })
@@ -61,15 +86,23 @@ export default function CoreIntegration() {
   const user = session.user
   const teamCode = user?.team?.code ?? ''
   const permissions = user?.permissions ?? []
-  const runtime = useMemo<Cp45Runtime>(() => ({
-    request,
-    userId: typeof user?.id === 'number' ? user.id : null,
-    sessionKey: teamCode + ':' + String(user?.id ?? ''),
-    permissions,
-    storage: storage(),
-    subscribe
-  }), [user?.id, teamCode, permissions])
-  return <Cp45Provider runtime={runtime}>
-    <Layout><GlobalEvents /><ContingencyModal /></Layout>
-  </Cp45Provider>
+  const runtime = useMemo<Cp45Runtime>(
+    () => ({
+      request,
+      userId: typeof user?.id === 'number' ? user.id : null,
+      sessionKey: teamCode + ':' + String(user?.id ?? ''),
+      permissions,
+      storage: storage(),
+      subscribe,
+    }),
+    [user?.id, teamCode, permissions],
+  )
+  return (
+    <Cp45Provider runtime={runtime}>
+      <Layout>
+        <GlobalEvents />
+        <ContingencyModal />
+      </Layout>
+    </Cp45Provider>
+  )
 }

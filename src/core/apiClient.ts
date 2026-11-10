@@ -13,7 +13,13 @@ export class ApiError extends Error {
   details: unknown
   requestId?: string
 
-  constructor(status: number, code: string, message: string, details: unknown = null, requestId?: string) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    details: unknown = null,
+    requestId?: string,
+  ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
@@ -29,7 +35,8 @@ export interface ApiOptions extends Omit<RequestInit, 'body'> {
 }
 function contentBody(body: unknown, headers: Headers): BodyInit | undefined {
   if (body === undefined || body === null) return undefined
-  if (body instanceof FormData || body instanceof Blob || body instanceof URLSearchParams) return body
+  if (body instanceof FormData || body instanceof Blob || body instanceof URLSearchParams)
+    return body
   if (typeof body === 'string') return body
   headers.set('Content-Type', 'application/json')
   return JSON.stringify(body)
@@ -37,10 +44,24 @@ function contentBody(body: unknown, headers: Headers): BodyInit | undefined {
 async function readResponse<T>(response: Response): Promise<T> {
   if (response.status === 204) return undefined as T
   const text = await response.text()
-  const data: unknown = text ? (() => { try { return JSON.parse(text) as unknown } catch { return text } })() : null
+  const data: unknown = text
+    ? (() => {
+        try {
+          return JSON.parse(text) as unknown
+        } catch {
+          return text
+        }
+      })()
+    : null
   if (!response.ok) {
-    const body = data && typeof data === 'object' ? data as LumonErrorBody : {}
-    throw new ApiError(response.status, body.error ?? 'HTTP_ERROR', body.message ?? `Error HTTP ${response.status}`, body.details, body.requestId)
+    const body = data && typeof data === 'object' ? (data as LumonErrorBody) : {}
+    throw new ApiError(
+      response.status,
+      body.error ?? 'HTTP_ERROR',
+      body.message ?? `Error HTTP ${response.status}`,
+      body.details,
+      body.requestId,
+    )
   }
   return data as T
 }
@@ -56,8 +77,14 @@ function retryDelay(response: Response, attempt: number) {
 }
 function pause(ms: number, signal?: AbortSignal | null) {
   return new Promise<void>((resolve, reject) => {
-    if (signal?.aborted) { reject(new DOMException('Aborted', 'AbortError')); return }
-    const timeout = setTimeout(() => { signal?.removeEventListener('abort', abort); resolve() }, ms)
+    if (signal?.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'))
+      return
+    }
+    const timeout = setTimeout(() => {
+      signal?.removeEventListener('abort', abort)
+      resolve()
+    }, ms)
     function abort() {
       clearTimeout(timeout)
       reject(new DOMException('Aborted', 'AbortError'))
@@ -69,8 +96,11 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
   assertApiConfigured()
   const { auth = true, retry = true, body, ...init } = options
   const method = (init.method ?? 'GET').toUpperCase()
-  const url = /^https?:\/\//.test(path) ? path : `${API_BASE_URL}${path.startsWith('/') ? path : '/' + path}`
-  if (new URL(url).origin !== new URL(API_BASE_URL).origin) throw new Error('El cliente HTTP solo admite la API de Lumon.')
+  const url = /^https?:\/\//.test(path)
+    ? path
+    : `${API_BASE_URL}${path.startsWith('/') ? path : '/' + path}`
+  if (new URL(url).origin !== new URL(API_BASE_URL).origin)
+    throw new Error('El cliente HTTP solo admite la API de Lumon.')
   let refreshed = false
   for (let attempt = 0; ; attempt++) {
     const headers = new Headers(init.headers)
@@ -82,8 +112,12 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
     }
     const response = await fetch(url, { ...init, method, headers, body: payload })
     if (response.status === 401 && auth && !refreshed) {
-      const failure: unknown = await response.clone().json().catch(() => null)
-      const code = failure && typeof failure === 'object' && 'error' in failure ? String(failure.error) : ''
+      const failure: unknown = await response
+        .clone()
+        .json()
+        .catch(() => null)
+      const code =
+        failure && typeof failure === 'object' && 'error' in failure ? String(failure.error) : ''
       if (code === 'TOKEN_EXPIRED') {
         refreshed = true
         const token = await refreshAccessToken()
