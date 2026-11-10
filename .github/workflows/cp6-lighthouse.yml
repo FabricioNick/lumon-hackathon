@@ -1,0 +1,41 @@
+name: CP6 accessibility audit
+on:
+  push:
+    branches: [test/cp6-accessibility]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Lighthouse accessibility on published login
+        shell: bash
+        run: |
+          export CHROME_PATH=$(node -e "console.log(require('playwright').chromium.executablePath())")
+          npx --yes lighthouse@12 "https://lumon-hackathon.vercel.app/login" \
+            --only-categories=accessibility \
+            --output=json \
+            --output-path=/tmp/lumon-lighthouse.json \
+            --chrome-flags="--headless --no-sandbox" \
+            --quiet
+          node - <<'NODE'
+          const { readFileSync } = require('node:fs')
+          const report = JSON.parse(readFileSync('/tmp/lumon-lighthouse.json', 'utf8'))
+          const score = Math.round(report.categories.accessibility.score * 100)
+          console.log('Lighthouse accessibility on public /login:', score)
+          const failed = report.categories.accessibility.auditRefs
+            .map(({ id }) => report.audits[id])
+            .filter(audit => audit && audit.score !== null && audit.score < 1)
+            .map(audit => ({ id: audit.id, score: audit.score, title: audit.title }))
+          console.log('Areas to improve:', JSON.stringify(failed))
+          if (score < 90) process.exit(1)
+          NODE
