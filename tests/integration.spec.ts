@@ -219,6 +219,9 @@ test('one native SSE leader distributes contingency and preserves failed acknowl
   await peer.getByRole('button', { name: 'Confirmar contingencia' }).click()
   await expect(peer.getByRole('dialog')).not.toBeVisible()
   await expect(page.getByRole('dialog')).not.toBeVisible()
+  const beforeTakeover = streams
+  await page.close()
+  await expect.poll(() => streams).toBeGreaterThan(beforeTakeover)
 })
 
 test('failed profile lookup returns to a usable login instead of an endless loading state', async ({

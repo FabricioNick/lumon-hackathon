@@ -392,3 +392,17 @@ test('late claim grant after cancellation is released and never becomes a ghost'
   await expect(page.getByText(/Tester: 3 celdas reservadas/)).toHaveCount(0)
   await expect(page.getByRole('gridcell', { selected: true })).toHaveCount(0)
 })
+
+test('reconnecting a selected reserved group obtains a fresh reservation', async ({ page }) => {
+  const fixture = await setup(page, { floor: true })
+  await login(page)
+  await expect(page.locator('[data-cell="15:15"]')).toContainText('1')
+  await page.locator('[data-cell="15:15"]').click()
+  await expect(page.getByText(/Tester: 3 celdas reservadas/)).toBeVisible()
+  fixture.socket?.close({ code: 1012, reason: 'Restart' })
+  await expect
+    .poll(() => fixture.calls.filter((call) => call.path === '/floor/tickets').length)
+    .toBe(2)
+  await expect(page.getByText(/Tester: 3 celdas reservadas/)).toBeVisible()
+  expect(fixture.frames.filter((frame) => frame.type === 'claim')).toHaveLength(2)
+})
