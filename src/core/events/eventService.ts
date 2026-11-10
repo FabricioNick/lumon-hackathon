@@ -168,7 +168,7 @@ export function startGlobalEvents() {
       if (navigator.locks?.request) {
         await navigator.locks.request(
           'lumon.sse.leader',
-          { ifAvailable: true },
+          { signal: controller.signal },
           async (lock) => {
             if (lock) await streamLoop(controller.signal)
           },
