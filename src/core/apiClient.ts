@@ -1,6 +1,3 @@
-import { z } from 'zod'
-import { rawRequest, request } from '../lib/http'
-export { ApiError } from '../lib/http'
 import { API_BASE_URL, BUILD, assertApiConfigured } from './config'
 import { clearTokens, getAccessToken, refreshAccessToken } from './auth/tokenStore'
 
@@ -30,23 +27,6 @@ export interface ApiOptions extends Omit<RequestInit, 'body'> {
   auth?: boolean
   retry?: boolean
 }
-export async function apiResponse(path: string, init: RequestInit = {}): Promise<Response> {
-  return rawRequest(path, {
-    method: init.method,
-    headers: init.headers,
-    body: init.body ?? undefined,
-    signal: init.signal ?? undefined,
-  })
-}
-export async function apiRequest<T>(path: string, options: ApiOptions = {}): Promise<T> {
-  return (await request(path, z.unknown(), {
-    method: options.method,
-    body: options.body,
-    headers: options.headers,
-    signal: options.signal ?? undefined,
-    public: options.auth === false,
-    retry: options.retry,
-  })) as T
 function contentBody(body: unknown, headers: Headers): BodyInit | undefined {
   if (body === undefined || body === null) return undefined
   if (body instanceof FormData || body instanceof Blob || body instanceof URLSearchParams) return body
