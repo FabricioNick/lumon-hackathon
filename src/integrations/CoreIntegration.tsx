@@ -7,18 +7,9 @@ import { Layout } from '../components/Layout'
 import GlobalEvents from '../core/events/GlobalEvents'
 import { getAuthSnapshot, subscribeAuth } from '../core/auth/authService'
 import { API_BASE_URL, BUILD } from '../core/config'
-import { clearTokens, getAccessToken, refreshAccessToken, subscribeSession } from '../core/auth/tokenStore'
+import { clearTokens, getAccessToken, refreshAccessToken } from '../core/auth/tokenStore'
 import { subscribeEvents } from '../core/events/eventService'
-import { configureAuth, setAccess } from '../lib/http'
 import '../features/cp45/styles.css'
-
-const cp2Refresh = async (previous: string | null) => {
-  if (!getAccessToken() || getAccessToken() === previous) await refreshAccessToken()
-  setAccess(getAccessToken())
-}
-configureAuth(cp2Refresh, () => clearTokens())
-setAccess(getAccessToken())
-subscribeSession(() => setAccess(getAccessToken()))
 
 async function request(path: string, init: RequestInit = {}): Promise<Response> {
   const url = /^https?:\/\//.test(path) ? path : API_BASE_URL + (path.startsWith('/') ? path : '/' + path)
