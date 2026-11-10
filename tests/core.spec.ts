@@ -97,3 +97,53 @@ test('simultaneous expired status requests trigger exactly one refresh and retry
   const refresh = network.requests.find(r => r.path === '/auth/refresh')
   expect(refresh?.body).toEqual({ refreshToken: 'refresh-1' })
 })
+
+
+test('cross-tab refresh rotates only once and logout closes both tabs within two seconds', async ({ context }) => {
+  let refreshCount = 0
+  const logoutBodies: unknown[] = []
+  await context.route('**/api/v1/**', async route => {
+    const req = route.request()
+    const path = new URL(req.url()).pathname.replace('/api/v1', '')
+    const json = (value: unknown, status = 200) => route.fulfill({
+      status, contentType: 'application/json', body: JSON.stringify(value)
+    })
+    if (path === '/meta/health') return json({ status: 'UP' })
+    if (path === '/auth/login') return json(pair)
+    if (path === '/auth/me') return json(user)
+    if (path === '/auth/refresh') {
+      refreshCount++
+      if (req.postDataJSON().refreshToken !== pair.refreshToken) {
+        return json({ error: 'REFRESH_REUSED', message: 'Token reused' }, 401)
+      }
+      return json(rotated)
+    }
+    if (path === '/auth/logout') {
+      logoutBodies.push(req.postDataJSON() as unknown)
+      return route.fulfill({ status: 204, body: '' })
+    }
+    if (path === '/events/tickets') return json({ error: 'CLEARANCE_REQUIRED', message: 'Locked' }, 403)
+    if (path === '/integrations/status') return json({ deploy: {}, storage: {}, clearance: {} })
+    if (path === '/clearance') return json({ granted: false })
+    if (path === '/team/roster') return json(roster)
+    return json({ error: 'NOT_FOUND', message: 'Not configured' }, 404)
+  })
+
+  const first = await context.newPage()
+  await first.goto('/login')
+  await first.getByLabel('Correo electrónico').fill('member@example.test')
+  await first.getByLabel('Contraseña').fill('password123')
+  await first.getByRole('button', { name: 'Ingresar al piso' }).click()
+  await expect(first).toHaveURL('/')
+
+  const second = await context.newPage()
+  await second.goto('/estado')
+  await expect(second.getByRole('heading', { name: 'Estado del piso' })).toBeVisible()
+  expect(refreshCount).toBe(1)
+
+  await first.getByRole('button', { name: 'Salir' }).click()
+  await expect(first).toHaveURL(/\/login/)
+  await expect(second).toHaveURL(/\/login/, { timeout: 2000 })
+  expect(logoutBodies).toEqual([{ refreshToken: rotated.refreshToken }])
+  expect(await second.evaluate(() => localStorage.getItem('lumon.refresh'))).toBeNull()
+})
