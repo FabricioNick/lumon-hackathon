@@ -1,4 +1,3 @@
-/* Praise Kier */
 import { Component } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
 

@@ -3,21 +3,22 @@ import {
   clearTokens,
   getAccessToken,
   getRefreshToken,
-  getSessionKey,
   hasRefreshToken,
   isTokenPair,
   refreshAccessToken,
+  requestPeerAccess,
   setTokens,
   subscribeSession,
+  withRefreshLock,
 } from './tokenStore'
 
 export interface LumonUser {
-  id: number
+  id?: number | string
   email?: string
   displayName?: string
   team?: { code: string; name: string }
   role?: { code: string; name: string }
-  permissions: string[]
+  permissions?: string[]
   clearance?: { granted: boolean; grantedAt?: string | null }
 }
 export interface RegisterPayload {
@@ -55,9 +56,7 @@ export function hasPermission(permission: string) {
   return Boolean(snapshot.user?.permissions?.includes(permission))
 }
 export async function loadProfile() {
-  const sessionKey = getSessionKey()
   const user = await apiRequest<LumonUser>('/auth/me')
-  if (!getAccessToken() || sessionKey !== getSessionKey()) throw new Error('La sesión ya se cerró.')
   update({ status: 'authenticated', user, error: null })
   return user
 }
@@ -70,7 +69,8 @@ export async function restoreAuth() {
     }
     update({ ...snapshot, status: 'loading' })
     try {
-      await refreshAccessToken()
+      if (!getAccessToken()) await requestPeerAccess()
+      if (!getAccessToken()) await refreshAccessToken()
       await loadProfile()
     } catch (error) {
       if (!hasRefreshToken())
@@ -111,7 +111,7 @@ async function startSession(
     update({
       status: 'anonymous',
       user: null,
-      error: 'No se pudo cargar el perfil. Inicia sesión de nuevo.',
+      error: error instanceof Error ? error.message : 'No se pudo cargar el perfil.',
     })
     throw error
   }
@@ -123,22 +123,28 @@ export function register(body: RegisterPayload) {
   return startSession('/auth/register', body)
 }
 export async function logout() {
-  await navigator.locks.request('lumon.refresh', async () => {
-    const refreshToken = getRefreshToken()
-    clearTokens()
-    try {
-      if (refreshToken)
-        await apiRequest<void>('/auth/logout', {
-          method: 'POST',
-          body: { refreshToken },
-          auth: false,
-          retry: false,
-        })
-    } finally {
+  try {
+    await withRefreshLock(async () => {
+      const refreshToken = getRefreshToken()
+      try {
+        if (refreshToken)
+          await apiRequest<void>('/auth/logout', {
+            method: 'POST',
+            body: { refreshToken },
+            auth: false,
+            retry: false,
+          })
+      } finally {
+        clearTokens()
+        update({ status: 'anonymous', user: null, error: null })
+      }
+    })
+  } finally {
+    if (snapshot.status !== 'anonymous') {
       clearTokens()
       update({ status: 'anonymous', user: null, error: null })
     }
-  })
+  }
 }
 subscribeSession(() => {
   if (!hasRefreshToken() && snapshot.status !== 'anonymous') {

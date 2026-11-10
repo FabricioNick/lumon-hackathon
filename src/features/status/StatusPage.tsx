@@ -1,8 +1,6 @@
-/* Praise Kier */
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { ApiError, apiRequest } from '../../core/apiClient'
 import { getAuthSnapshot, subscribeAuth } from '../../core/auth/authService'
-import { storageConfigFromEnv } from '../media/storageConfig'
 import { API_BASE_URL, BUILD } from '../../core/config'
 
 interface DeployChallenge {
@@ -44,17 +42,12 @@ export function StatusPage() {
   const [message, setMessage] = useState('')
   const [working, setWorking] = useState(false)
 
-  const [chaos, setChaos] = useState(1)
   const refresh = useCallback(async () => {
     const [a, b, c] = await Promise.allSettled([
       apiRequest('/integrations/status'),
       apiRequest('/clearance'),
       apiRequest<RosterResponse>('/team/roster'),
     ])
-    const errors = [a, b, c]
-      .filter((result) => result.status === 'rejected')
-      .map((result) => (result.status === 'rejected' ? formatError(result.reason) : ''))
-    if (errors.length) setMessage(errors.join('\n'))
     if (a.status === 'fulfilled') setIntegrations(a.value)
     if (b.status === 'fulfilled') setClearance(b.value)
     if (c.status === 'fulfilled') {
@@ -65,9 +58,7 @@ export function StatusPage() {
   }, [])
 
   useEffect(() => {
-    queueMicrotask(() => {
-      void refresh()
-    })
+    void refresh()
   }, [refresh])
   useEffect(() => {
     let active = true
@@ -147,10 +138,6 @@ export function StatusPage() {
       setMessage('Completa los tres nombres (3 o más caracteres) y los tres códigos alfanuméricos.')
       return
     }
-    if (new Set(members.map((member) => member.code.trim().toLowerCase())).size !== 3) {
-      setMessage('Los códigos de los tres integrantes deben ser únicos.')
-      return
-    }
     const body = {
       members: members.map((member) => ({ name: member.name.trim(), code: member.code.trim() })),
     }
@@ -206,59 +193,6 @@ export function StatusPage() {
         </pre>
       )}
       <div className="section-grid">
-        <section className="panel">
-          <h2>Pruebas de resiliencia</h2>
-          <label>
-            Nivel de caos
-            <select value={chaos} onChange={(event) => setChaos(Number(event.target.value))}>
-              <option value={0}>0 — Sin caos</option>
-              <option value={1}>1 — Evaluación</option>
-              <option value={2}>2 — Intenso</option>
-            </select>
-          </label>
-          <button
-            className="button primary"
-            disabled={working}
-            onClick={() =>
-              void act(
-                () =>
-                  apiRequest('/workspace/chaos', {
-                    method: 'PUT',
-                    body: { level: chaos },
-                    retry: false,
-                  }),
-                'Caos actualizado.',
-              )
-            }
-          >
-            Aplicar caos
-          </button>
-          <button
-            className="button secondary"
-            disabled={working || !session.user?.permissions.includes('team:manage')}
-            onClick={() =>
-              void act(async () => {
-                const storage = storageConfigFromEnv()
-                if (!storage)
-                  throw new Error(
-                    'Configura las variables públicas del storage y vuelve a construir.',
-                  )
-                const body =
-                  storage.provider === 'SUPABASE'
-                    ? { ...storage, bucket: 'lumon-media' }
-                    : {
-                        provider: storage.provider,
-                        cloudName: storage.cloudName,
-                        uploadPreset: storage.uploadPreset,
-                      }
-                return apiRequest('/integrations/storage', { method: 'PUT', body, retry: false })
-              }, 'Storage verificado.')
-            }
-          >
-            Verificar storage configurado
-          </button>
-        </section>
-
         <section className="panel">
           <p className="eyebrow">Integraciones</p>
           <h2>Estado de producción</h2>

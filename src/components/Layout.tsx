@@ -1,4 +1,3 @@
-/* Praise Kier */
 import { useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
@@ -20,10 +19,8 @@ export function Layout({ children }: { children?: ReactNode }) {
   return (
     <>
       <header className="site-header">
-        <Link to="/" className="brand" title="Inicio">
-          <span className="brand-mark" aria-hidden="true">
-            L
-          </span>
+        <Link to="/" className="brand" aria-label="LUMON INDUSTRIES">
+          <span className="brand-mark">L</span>
           <span>
             LUMON <small>INDUSTRIES</small>
           </span>

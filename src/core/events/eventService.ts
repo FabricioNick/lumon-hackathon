@@ -1,5 +1,5 @@
 import { apiRequest, ApiError } from '../apiClient'
-import { clearTokens, getSessionKey } from '../auth/tokenStore'
+import { clearTokens } from '../auth/tokenStore'
 import { API_BASE_URL } from '../config'
 
 export interface LumonEvent {
@@ -9,10 +9,10 @@ export interface LumonEvent {
 }
 export type EventConnection = 'offline' | 'connecting' | 'live' | 'locked' | 'reconnecting'
 const callbacks = new Set<(event: LumonEvent) => void>()
+const recentEvents: LumonEvent[] = []
 const statusCallbacks = new Set<() => void>()
 let connection: EventConnection = 'offline'
 let lastEventId = ''
-let scope = ''
 const seen = new Set<string>()
 const channel =
   typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('lumon.events') : null
@@ -28,6 +28,7 @@ export function subscribeEventStatus(listener: () => void) {
 }
 export function subscribeEvents(listener: (event: LumonEvent) => void) {
   callbacks.add(listener)
+  for (const event of recentEvents) listener(event)
   return () => {
     callbacks.delete(listener)
   }
@@ -35,7 +36,7 @@ export function subscribeEvents(listener: (event: LumonEvent) => void) {
 function changeStatus(status: EventConnection, publish = true) {
   connection = status
   statusCallbacks.forEach((listener) => listener())
-  if (publish) channel?.postMessage({ kind: 'status', status, scope })
+  if (publish) channel?.postMessage({ kind: 'status', status })
 }
 function accept(event: LumonEvent, publish = true) {
   if (event.id && seen.has(event.id)) return
@@ -45,20 +46,20 @@ function accept(event: LumonEvent, publish = true) {
     seen.add(event.id)
     if (seen.size > 3000) seen.delete(seen.values().next().value ?? '')
   }
-  if (event.type === 'session.revoked') clearTokens()
+  if (event.type === 'session.revoked') {
+    recentEvents.length = 0
+    clearTokens()
+  } else {
+    recentEvents.push(event)
+    if (recentEvents.length > 100) recentEvents.shift()
+  }
   callbacks.forEach((listener) => listener(event))
   window.dispatchEvent(new CustomEvent('lumon-event', { detail: event }))
-  if (publish) channel?.postMessage({ kind: 'event', event, scope })
+  if (publish) channel?.postMessage({ kind: 'event', event })
 }
 channel?.addEventListener('message', (event) => {
   const message: unknown = event.data
-  if (
-    !message ||
-    typeof message !== 'object' ||
-    !('scope' in message) ||
-    message.scope !== getSessionKey()
-  )
-    return
+  if (!message || typeof message !== 'object') return
   if ('kind' in message && message.kind === 'event' && 'event' in message) {
     const payload = message.event as LumonEvent
     if (payload && typeof payload.type === 'string') accept(payload, false)
@@ -89,20 +90,14 @@ function connectStream(ticket: string, signal: AbortSignal) {
     if (lastEventId) url.searchParams.set('lastEventId', lastEventId)
     const source = new EventSource(url.toString())
     let closed = false
-    let activity = Date.now()
-    const watchdog = setInterval(() => {
-      if (Date.now() - activity >= 45000) close()
-    }, 5000)
     function close() {
       if (closed) return
       closed = true
-      clearInterval(watchdog)
       signal.removeEventListener('abort', close)
       source.close()
       resolve()
     }
     function handle(type: string, message: MessageEvent<string>) {
-      activity = Date.now()
       let data: unknown = message.data
       try {
         data = JSON.parse(message.data) as unknown
@@ -110,10 +105,7 @@ function connectStream(ticket: string, signal: AbortSignal) {
       accept({ type, data, id: message.lastEventId || '' })
       if (type === 'stream.superseded') close()
     }
-    source.onopen = () => {
-      activity = Date.now()
-      changeStatus('live')
-    }
+    source.onopen = () => changeStatus('live')
     source.onerror = close
     source.onmessage = (event) => handle('message', event)
     for (const type of [
@@ -151,6 +143,7 @@ async function streamLoop(signal: AbortSignal) {
               : null
           : null
       if (typeof ticket !== 'string' || !ticket) throw new Error('Ticket SSE inválido.')
+      attempt = 0
       await connectStream(ticket, signal)
     } catch (error) {
       if (signal.aborted) break
@@ -166,12 +159,6 @@ async function streamLoop(signal: AbortSignal) {
   changeStatus('offline')
 }
 export function startGlobalEvents() {
-  const nextScope = getSessionKey()
-  if (scope !== nextScope) {
-    scope = nextScope
-    lastEventId = ''
-    seen.clear()
-  }
   const controller = new AbortController()
   let running = false
   const elect = async () => {

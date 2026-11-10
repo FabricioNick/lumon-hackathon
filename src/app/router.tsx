@@ -1,19 +1,28 @@
-/* Praise Kier */
 import { lazy, Suspense, useEffect, useState, useSyncExternalStore } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { getAuthSnapshot, restoreAuth, subscribeAuth } from '../core/auth/authService'
-import { RouteBoundary } from '../components/RouteBoundary'
 import { apiRequest } from '../core/apiClient'
-const CoreIntegration = lazy(() => import('../integrations/CoreIntegration'))
+import { RouteBoundary } from '../components/RouteBoundary'
 import { AuthPage } from '../features/auth/AuthPage'
 import { StatusPage } from '../features/status/StatusPage'
 
-const Files = lazy(() => import('../files/FilesPage'))
-const Refine = lazy(() => import('../files/RefinePage'))
-import { createCp45Routes } from '../features/cp45/routeDefinitions'
-import '../features/cp45/styles.css'
+const CoreIntegration = lazy(() => import('../integrations/CoreIntegration'))
+const FilesPage = lazy(() => import('../files/FilesPage'))
+const RefinePage = lazy(() => import('../files/RefinePage'))
+const RefinersPage = lazy(() => import('../features/refiners/pages/RefinersPage.tsx'))
+const RefinerDetailPage = lazy(() => import('../features/refiners/pages/RefinerDetailPage.tsx'))
+const BadgeEditorPage = lazy(() => import('../features/refiners/pages/BadgeEditorPage.tsx'))
+const RefinerEditPage = lazy(() => import('../features/refiners/pages/RefinerEditPage.tsx'))
+const IncidentsPage = lazy(() => import('../features/incidents/pages/IncidentsPage.tsx'))
+const NewIncidentPage = lazy(() => import('../features/incidents/pages/NewIncidentPage.tsx'))
 
-function Private({ children, permission }: { children: React.ReactNode; permission?: string }) {
+function Private({
+  children,
+  permission,
+}: {
+  children: React.ReactNode
+  permission?: string | string[]
+}) {
   const session = useSyncExternalStore(subscribeAuth, getAuthSnapshot)
   const location = useLocation()
   if (session.status === 'loading') return <Loading />
@@ -21,11 +30,13 @@ function Private({ children, permission }: { children: React.ReactNode; permissi
     const next = encodeURIComponent(location.pathname + location.search)
     return <Navigate to={'/login?next=' + next} replace />
   }
-  if (permission && !session.user?.permissions?.includes(permission))
+  const required = typeof permission === 'string' ? [permission] : (permission ?? [])
+  const missing = required.find((name) => !session.user?.permissions?.includes(name))
+  if (missing)
     return (
       <section className="panel">
         <h1>Sin permiso</h1>
-        <p>Tu rol no tiene el permiso {permission}.</p>
+        <p>Tu usuario no tiene el permiso {missing}.</p>
         <Link to="/">Volver al inicio</Link>
       </section>
     )
@@ -184,11 +195,11 @@ function AppRoutes() {
             path="/files"
             element={
               <RouteBoundary>
-                <Suspense fallback={<p role="status">Cargando…</p>}>
-                  <Private permission="files:read">
-                    <Files />
-                  </Private>
-                </Suspense>
+                <Private permission="files:read">
+                  <Suspense fallback={<p className="panel">Cargando archivos…</p>}>
+                    <FilesPage />
+                  </Suspense>
+                </Private>
               </RouteBoundary>
             }
           />
@@ -196,27 +207,86 @@ function AppRoutes() {
             path="/files/:id/refine"
             element={
               <RouteBoundary>
-                <Suspense fallback={<p role="status">Cargando…</p>}>
-                  <Private permission="files:read">
-                    <Refine />
-                  </Private>
-                </Suspense>
+                <Private permission="files:read">
+                  <Suspense fallback={<p className="panel">Cargando refinamiento…</p>}>
+                    <RefinePage />
+                  </Suspense>
+                </Private>
               </RouteBoundary>
             }
           />
-          {createCp45Routes().map((route) => (
-            <Route
-              key={route.path}
-              path={route.path}
-              element={
-                <RouteBoundary>
-                  <div className="cp45 bg-slate-50 text-slate-900 p-6">
-                    <Suspense fallback={<p role="status">Cargando…</p>}>{route.element}</Suspense>
-                  </div>
-                </RouteBoundary>
-              }
-            />
-          ))}
+          <Route
+            path="/refiners"
+            element={
+              <RouteBoundary>
+                <Private permission="refiners:read">
+                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}>
+                    <RefinersPage />
+                  </Suspense>
+                </Private>
+              </RouteBoundary>
+            }
+          />
+          <Route
+            path="/refiners/:id"
+            element={
+              <RouteBoundary>
+                <Private permission="refiners:read">
+                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}>
+                    <RefinerDetailPage />
+                  </Suspense>
+                </Private>
+              </RouteBoundary>
+            }
+          />
+          <Route
+            path="/refiners/:id/badge"
+            element={
+              <RouteBoundary>
+                <Private permission={['refiners:read', 'refiners:write', 'media:upload']}>
+                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}>
+                    <BadgeEditorPage />
+                  </Suspense>
+                </Private>
+              </RouteBoundary>
+            }
+          />
+          <Route
+            path="/refiners/:id/edit"
+            element={
+              <RouteBoundary>
+                <Private permission={['refiners:read', 'refiners:write']}>
+                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}>
+                    <RefinerEditPage />
+                  </Suspense>
+                </Private>
+              </RouteBoundary>
+            }
+          />
+          <Route
+            path="/incidents"
+            element={
+              <RouteBoundary>
+                <Private permission="incidents:read">
+                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}>
+                    <IncidentsPage />
+                  </Suspense>
+                </Private>
+              </RouteBoundary>
+            }
+          />
+          <Route
+            path="/incidents/new"
+            element={
+              <RouteBoundary>
+                <Private permission={['incidents:create', 'media:upload']}>
+                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}>
+                    <NewIncidentPage />
+                  </Suspense>
+                </Private>
+              </RouteBoundary>
+            }
+          />
           <Route
             path="*"
             element={

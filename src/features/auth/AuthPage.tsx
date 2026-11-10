@@ -1,4 +1,3 @@
-/* Praise Kier */
 import { useState, useSyncExternalStore } from 'react'
 import type { FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
@@ -15,9 +14,8 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const [error, setError] = useState('')
   const [fields, setFields] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
-  const next = params.get('next') ?? params.get('returnTo')
-  const destination =
-    next?.startsWith('/') && !next.startsWith('//') && !next.includes('\\') ? next : '/'
+  const next = params.get('next')
+  const destination = next?.startsWith('/') && !next.startsWith('//') ? next : '/'
 
   if (session.status === 'loading')
     return (
@@ -33,7 +31,6 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (busy) return
     setBusy(true)
     setError('')
     setFields({})
