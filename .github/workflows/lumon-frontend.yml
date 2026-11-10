@@ -1,7 +1,7 @@
 name: Frontend verification
 on:
   push:
-    branches: [main, feat/core-auth-deploy]
+    branches: [main, feat/core-auth-deploy, fix/full-integration]
   pull_request:
     branches: [main]
 permissions:
@@ -20,6 +20,10 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run lint
+      - run: npm run format:check
+      - run: npm run test:unit
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
       - name: Enforce initial JavaScript budget
         run: |
           node --input-type=module -e '

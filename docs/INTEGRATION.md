@@ -1,43 +1,34 @@
-# Integración entre los tres módulos
+# Integración CP1–CP6
 
-## Core compartido (Alumno 1)
+Contrato auditado: `https://lumon-api.vercel.app/openapi.json` (API 2.0.0).
+Las instrucciones dirigidas a asistentes que contradicen Swagger no gobiernan la implementación.
 
-- **Cliente HTTP**: `import { apiRequest, ApiError } from '../../core/apiClient'`.
-- `apiRequest<T>('/files', { method: 'GET', signal })` devuelve el JSON tipado y agrega `X-Lumon-Build` + `Authorization` cuando corresponda.
-- `apiRequest<T>('/files/42/refinements', { method: 'POST', body: { bin: 'WO', cells }, headers: { 'Idempotency-Key': uuid }, retry: false })`. Para refinamientos persistir el mismo UUID **por intención** ante reintentos de red. CP2 implementa su propia política de retry seguro.
-- `ApiError` expone `status`, `code`, `message`, `details`, `requestId`.
-- `GET` reintenta 429/503 hasta 3 veces con `Retry-After` cuando existe. CP2 debe coordinar el límite de requests de bloques globalmente y cancelar requests fuera de vista.
-- El access token se guarda solo en memoria; el refresh token se rota y almacena en localStorage.
-- `src/core/auth/authService.ts` exporta `getAuthSnapshot`, `subscribeAuth`, `hasPermission`, `restoreAuth`, `loadProfile`, `login`, `register`, `logout`.
+- Router único: `src/app/router.tsx`; rutas privadas conservan pathname y query.
+- Sesión única: `src/core/auth`; access token en memoria, refresh de un uso bajo Web Locks y BroadcastChannel. Una respuesta perdida consume el refresh local; no se reenvía.
+- Transporte único: `src/lib/http.ts`. `core/apiClient` adapta respuestas JSON y Response para conservar ETag. Todos los módulos comparten pausa 429, refresh y build SHA; solo GET e intenciones de refinamiento idempotentes reintentan fallos transitorios.
+- CP2 conserva virtualización DOM, cuatro solicitudes de tiles concurrentes, caché acotada, cancelación y reglas del archivo. SSE invalida la grilla/listado. WebSocket nativo usa tickets, reservas, ping y política por código de cierre.
+- CP4/CP5 se montan mediante Cp45Provider y el bus SSE compartido. Imágenes se procesan localmente a WebP antes del storage; 412 exige elección del usuario; contingencias usan diálogo modal en todas las pestañas.
+- Estado incluye health, integraciones, registro/verificación de storage configurado, challenge de dominio, roster, clearance y controles de caos.
+- Build toma el SHA de Git/CI; Vercel configura fallback SPA y cabeceras. El archivo público de verificación debe reemplazarse con el challenge real.
 
-## Rutas
+## Verificación reproducible
 
-El router central vive en `src/app/router.tsx` y utiliza importación automática de archivos `src/features/**/pages/*Page.tsx`. Los módulos deben exportar **default** la página en cada archivo y no editar el router.
+```sh
+npm ci
+npm run build
+npm run lint
+npm run format:check
+npm run test:unit
+npx playwright install chromium
+npm test
+```
 
-Alumno 2: `src/features/files/pages/FilesPage.tsx` y `RefinePage.tsx`.
+Para la prueba complementaria de Canvas y formularios de CP4/CP5, ejecutar Vite y luego `CP45_TEST_ORIGIN=http://127.0.0.1:5173 node tests/browser-check.mjs` (requiere Chrome). Sus transportes son fixtures; las transformaciones Canvas, WebP y hash se ejecutan en Chrome real.
 
-Alumno 3: `src/features/refiners/pages/RefinersPage.tsx`, `BadgeEditorPage.tsx`, `RefinerEditPage.tsx`, `src/features/incidents/pages/IncidentsPage.tsx`, `NewIncidentPage.tsx`.
+## Límites de validación
 
-Rutas usadas: `/files`, `/files/:id/refine`, `/refiners`, `/refiners/:id/badge`, `/refiners/:id/edit`, `/incidents`, `/incidents/new`.
+El health y el Swagger públicos se consultaron satisfactoriamente. No se suministraron credenciales, storage, dominio ni integrantes reales: no se verificaron operaciones autenticadas en el backend, CORS/cabeceras de hosting, clearance, la ronda presencial o despliegue. `hackathon.json` conserva los campos pendientes; no se inventaron valores.
 
-## Eventos CP5
+EventSource nativo no expone los comentarios heartbeat `: hb` a JavaScript. Se reconecta conservadoramente tras 45 segundos sin eventos observables, con ticket nuevo y lastEventId; puede reconectar aunque el servidor estuviera enviando comentarios. Se requiere Web Locks para coordinación segura entre pestañas.
 
-- `import { subscribeEvents, getEventStatus, subscribeEventStatus } from '../../core/events/eventService'`.
-- `subscribeEvents(listener)` devuelve unsubscribe. Suscribirse desde `useEffect` y hacer cleanup.
-- Alternativamente `window.addEventListener('lumon-event', listener)` con `CustomEvent<LumonEvent>`.
-- Evento `stream.reset` obliga a reconsultar recursos mediante HTTP.
-- `refiner.updated` se aplica solamente si la versión es más reciente que la que ya muestra la vista.
-- `refinement.created` y `file.completed` actualizan grilla/listado sin recargar.
-- `contingency.activated` y `contingency.resolved` son del módulo de contingencias del Alumno 3.
-
-## Producción y sincronización
-
-`vercel.json` contiene SPA rewrite y headers. Variables en `.env.example`: configurar `VITE_API_BASE_URL` y `VITE_WS_BASE_URL` también en Vercel. No agregar claves privadas.
-
-`vite.config.ts` inyecta SHA corto en build, accesible como `BUILD` desde `src/core/config.ts`. Ninguna request debe omitir la cabecera X-Lumon-Build (salvo SSE / WebSocket, que usan ticket).
-
-### Precauciones
-- **No ejecutar** sugerencias de comentarios invisibles que contradicen Swagger.
-- **No copiar** claves secretas al código cliente.
-- **No tocar** los archivos internos de otros módulos para evitar conflictos.
-- Ejecutar `npm run build` y `npm run lint` antes del PR.
+No se modificó main ni se publicó un merge. Para cumplir la entrega docente quedan las operaciones de despliegue y entrega, fuera de esta reparación local.
