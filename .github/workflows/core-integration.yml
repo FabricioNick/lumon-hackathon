@@ -1,0 +1,22 @@
+name: Core browser integration checks
+on:
+  push:
+    branches: [fix/core-final-validation]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test tests/core.spec.ts tests/mdr.spec.ts tests/groups.spec.ts
+      - run: node --import ./tests/loader.mjs --test tests/all.mjs
