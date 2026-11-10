@@ -1,5 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import type { ComponentType } from 'react'
+import { lazy, Suspense, useEffect, useState, useSyncExternalStore } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { getAuthSnapshot, restoreAuth, subscribeAuth } from '../core/auth/authService'
 import { apiRequest } from '../core/apiClient'
@@ -10,30 +9,12 @@ import { StatusPage } from '../features/status/StatusPage'
 const CoreIntegration = lazy(() => import('../integrations/CoreIntegration'))
 const FilesPage = lazy(() => import('../files/FilesPage'))
 const RefinePage = lazy(() => import('../files/RefinePage'))
-const modules = import.meta.glob<{ default: ComponentType }>('../features/**/pages/*Page.tsx')
-
-function FeaturePage({ modulePath, label }: { modulePath: string; label: string }) {
-  const Component = useMemo(() => {
-    const loader = modules[modulePath]
-    return loader ? lazy(loader) : null
-  }, [modulePath])
-  if (!Component)
-    return (
-      <section className="panel">
-        <p className="eyebrow">Módulo en integración</p>
-        <h1>{label}</h1>
-        <p>
-          Tu compañero está desarrollando este módulo en su rama. Aparecerá al integrar su Pull
-          Request.
-        </p>
-      </section>
-    )
-  return (
-    <Suspense fallback={<p className="panel">Cargando {label}…</p>}>
-      <Component />
-    </Suspense>
-  )
-}
+const RefinersPage = lazy(() => import('../features/refiners/pages/RefinersPage.tsx'))
+const RefinerDetailPage = lazy(() => import('../features/refiners/pages/RefinerDetailPage.tsx'))
+const BadgeEditorPage = lazy(() => import('../features/refiners/pages/BadgeEditorPage.tsx'))
+const RefinerEditPage = lazy(() => import('../features/refiners/pages/RefinerEditPage.tsx'))
+const IncidentsPage = lazy(() => import('../features/incidents/pages/IncidentsPage.tsx'))
+const NewIncidentPage = lazy(() => import('../features/incidents/pages/NewIncidentPage.tsx'))
 
 function Private({
   children,
@@ -239,10 +220,7 @@ function AppRoutes() {
             element={
               <RouteBoundary>
                 <Private permission="refiners:read">
-                  <FeaturePage
-                    modulePath="../features/refiners/pages/RefinersPage.tsx"
-                    label="Expedientes"
-                  />
+                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}><RefinersPage /></Suspense>
                 </Private>
               </RouteBoundary>
             }
@@ -252,10 +230,7 @@ function AppRoutes() {
             element={
               <RouteBoundary>
                 <Private permission="refiners:read">
-                  <FeaturePage
-                    modulePath="../features/refiners/pages/RefinerDetailPage.tsx"
-                    label="Expediente"
-                  />
+                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}><RefinerDetailPage /></Suspense>
                 </Private>
               </RouteBoundary>
             }
@@ -265,10 +240,7 @@ function AppRoutes() {
             element={
               <RouteBoundary>
                 <Private permission={['refiners:read', 'refiners:write', 'media:upload']}>
-                  <FeaturePage
-                    modulePath="../features/refiners/pages/BadgeEditorPage.tsx"
-                    label="Fotocheck"
-                  />
+                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}><BadgeEditorPage /></Suspense>
                 </Private>
               </RouteBoundary>
             }
@@ -278,10 +250,7 @@ function AppRoutes() {
             element={
               <RouteBoundary>
                 <Private permission={['refiners:read', 'refiners:write']}>
-                  <FeaturePage
-                    modulePath="../features/refiners/pages/RefinerEditPage.tsx"
-                    label="Editar expediente"
-                  />
+                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}><RefinerEditPage /></Suspense>
                 </Private>
               </RouteBoundary>
             }
@@ -291,10 +260,7 @@ function AppRoutes() {
             element={
               <RouteBoundary>
                 <Private permission="incidents:read">
-                  <FeaturePage
-                    modulePath="../features/incidents/pages/IncidentsPage.tsx"
-                    label="Incidencias"
-                  />
+                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}><IncidentsPage /></Suspense>
                 </Private>
               </RouteBoundary>
             }
@@ -304,10 +270,7 @@ function AppRoutes() {
             element={
               <RouteBoundary>
                 <Private permission={['incidents:create', 'media:upload']}>
-                  <FeaturePage
-                    modulePath="../features/incidents/pages/NewIncidentPage.tsx"
-                    label="Nueva incidencia"
-                  />
+                  <Suspense fallback={<p className="panel">Cargando módulo…</p>}><NewIncidentPage /></Suspense>
                 </Private>
               </RouteBoundary>
             }
