@@ -104,6 +104,10 @@ function waitForNewAccess(previous: string | null, timeoutMs = 900): Promise<str
   })
 }
 
+export function requestPeerAccess(): Promise<string | null> {
+  return waitForNewAccess(null, 350)
+}
+
 export async function refreshAccessToken(): Promise<string | null> {
   if (refreshing) return refreshing
 

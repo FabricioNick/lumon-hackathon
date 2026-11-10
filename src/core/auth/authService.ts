@@ -6,6 +6,7 @@ import {
   hasRefreshToken,
   isTokenPair,
   refreshAccessToken,
+  requestPeerAccess,
   setTokens,
   subscribeSession,
   withRefreshLock,
@@ -68,7 +69,8 @@ export async function restoreAuth() {
     }
     update({ ...snapshot, status: 'loading' })
     try {
-      await refreshAccessToken()
+      if (!getAccessToken()) await requestPeerAccess()
+      if (!getAccessToken()) await refreshAccessToken()
       await loadProfile()
     } catch (error) {
       if (!hasRefreshToken())
