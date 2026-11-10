@@ -1,31 +1,30 @@
 /* Praise Kier */
-import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { Permission } from "../../cp45/runtime";
-import { Feedback } from "../../cp45/ui";
-import { ImagePicker } from "../../media/ImagePicker";
-import { UploadPanel } from "../../media/UploadPanel";
-import type { Crop, Media } from "../../media/types";
-import { ImageCropper } from "../components/ImageCropper";
-import { ConflictResolver } from "../components/ConflictResolver";
-import { useRefinerEditor } from "../useRefinerEditor";
+import { useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Permission } from '../../cp45/runtime'
+import { Feedback } from '../../cp45/ui'
+import { ImagePicker } from '../../media/ImagePicker'
+import { UploadPanel } from '../../media/UploadPanel'
+import type { Crop, Media } from '../../media/types'
+import { ImageCropper } from '../components/ImageCropper'
+import { ConflictResolver } from '../components/ConflictResolver'
+import { useRefinerEditor } from '../useRefinerEditor'
 export default function BadgeEditorPage() {
-  const { id = "" } = useParams();
-  const navigate = useNavigate();
-  const editor = useRefinerEditor(id);
-  const [file, setFile] = useState<File>();
-  const [selectionId, setSelectionId] = useState("");
-  const [crop, setCrop] = useState<Crop>();
-  const [media, setMedia] = useState<Media>();
+  const { id = '' } = useParams()
+  const navigate = useNavigate()
+  const editor = useRefinerEditor(id)
+  const [file, setFile] = useState<File>()
+  const [selectionId, setSelectionId] = useState('')
+  const [crop, setCrop] = useState<Crop>()
+  const [media, setMedia] = useState<Media>()
   function select(files: File[]) {
-    setSelectionId(crypto.randomUUID());
-    setFile(files[0]);
-    setCrop(undefined);
-    setMedia(undefined);
+    setSelectionId(crypto.randomUUID())
+    setFile(files[0])
+    setCrop(undefined)
+    setMedia(undefined)
   }
   async function save() {
-    if (media && (await editor.save({ badgeMediaId: media.mediaId })))
-      navigate(`/refiners/${id}`);
+    if (media && (await editor.save({ badgeMediaId: media.mediaId }))) navigate(`/refiners/${id}`)
   }
   return (
     <Permission name="refiners:write">
@@ -34,20 +33,16 @@ export default function BadgeEditorPage() {
         <h1 className="my-6 text-3xl font-semibold">Editar fotocheck</h1>
         <Feedback
           loading={editor.loading}
-          error={editor.snapshot ? "" : editor.error}
+          error={editor.snapshot ? '' : editor.error}
           retry={editor.reload}
         />
         {editor.snapshot && editor.error && <p role="alert">{editor.error}</p>}
         {editor.snapshot && (
           <>
-            <p>
-              {editor.snapshot.refiner.fullName} · WebP 512 × 512 · máximo 120
-              KB
-            </p>
+            <p>{editor.snapshot.refiner.fullName} · WebP 512 × 512 · máximo 120 KB</p>
             {editor.remoteChanged && (
               <p role="status">
-                El expediente cambió mientras editabas. Al guardar se comprobará
-                la versión.
+                El expediente cambió mientras editabas. Al guardar se comprobará la versión.
               </p>
             )}
             {!editor.conflict && (
@@ -72,9 +67,7 @@ export default function BadgeEditorPage() {
                 )}
                 {media && (
                   <button disabled={editor.busy} onClick={() => void save()}>
-                    {editor.busy
-                      ? "Guardando…"
-                      : "Guardar fotocheck confirmado"}
+                    {editor.busy ? 'Guardando…' : 'Guardar fotocheck confirmado'}
                   </button>
                 )}
               </>
@@ -87,8 +80,8 @@ export default function BadgeEditorPage() {
                 onCancel={editor.cancelConflict}
                 onResolve={(patch) => {
                   void editor.resolve(patch).then((ok) => {
-                    if (ok) navigate(`/refiners/${id}`);
-                  });
+                    if (ok) navigate(`/refiners/${id}`)
+                  })
                 }}
               />
             )}
@@ -96,5 +89,5 @@ export default function BadgeEditorPage() {
         )}
       </Permission>
     </Permission>
-  );
+  )
 }

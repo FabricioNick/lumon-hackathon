@@ -1,45 +1,64 @@
 import { apiRequest, ApiError } from '../apiClient'
-import { clearTokens } from '../auth/tokenStore'
+import { clearTokens, getSessionKey } from '../auth/tokenStore'
 import { API_BASE_URL } from '../config'
 
-export interface LumonEvent { id: string; type: string; data: unknown }
+export interface LumonEvent {
+  id: string
+  type: string
+  data: unknown
+}
 export type EventConnection = 'offline' | 'connecting' | 'live' | 'locked' | 'reconnecting'
 const callbacks = new Set<(event: LumonEvent) => void>()
 const statusCallbacks = new Set<() => void>()
 let connection: EventConnection = 'offline'
 let lastEventId = ''
+let scope = ''
 const seen = new Set<string>()
-const channel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('lumon.events') : null
+const channel =
+  typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('lumon.events') : null
 
-export function getEventStatus() { return connection }
+export function getEventStatus() {
+  return connection
+}
 export function subscribeEventStatus(listener: () => void) {
   statusCallbacks.add(listener)
-  return () => { statusCallbacks.delete(listener) }
+  return () => {
+    statusCallbacks.delete(listener)
+  }
 }
 export function subscribeEvents(listener: (event: LumonEvent) => void) {
   callbacks.add(listener)
-  return () => { callbacks.delete(listener) }
+  return () => {
+    callbacks.delete(listener)
+  }
 }
 function changeStatus(status: EventConnection, publish = true) {
   connection = status
-  statusCallbacks.forEach(listener => listener())
-  if (publish) channel?.postMessage({ kind: 'status', status })
+  statusCallbacks.forEach((listener) => listener())
+  if (publish) channel?.postMessage({ kind: 'status', status, scope })
 }
 function accept(event: LumonEvent, publish = true) {
   if (event.id && seen.has(event.id)) return
   if (event.id) {
-    if (/^\d+$/.test(event.id) && (!lastEventId || BigInt(event.id) > BigInt(lastEventId))) lastEventId = event.id
+    if (/^\d+$/.test(event.id) && (!lastEventId || BigInt(event.id) > BigInt(lastEventId)))
+      lastEventId = event.id
     seen.add(event.id)
     if (seen.size > 3000) seen.delete(seen.values().next().value ?? '')
   }
   if (event.type === 'session.revoked') clearTokens()
-  callbacks.forEach(listener => listener(event))
+  callbacks.forEach((listener) => listener(event))
   window.dispatchEvent(new CustomEvent('lumon-event', { detail: event }))
-  if (publish) channel?.postMessage({ kind: 'event', event })
+  if (publish) channel?.postMessage({ kind: 'event', event, scope })
 }
-channel?.addEventListener('message', event => {
+channel?.addEventListener('message', (event) => {
   const message: unknown = event.data
-  if (!message || typeof message !== 'object') return
+  if (
+    !message ||
+    typeof message !== 'object' ||
+    !('scope' in message) ||
+    message.scope !== getSessionKey()
+  )
+    return
   if ('kind' in message && message.kind === 'event' && 'event' in message) {
     const payload = message.event as LumonEvent
     if (payload && typeof payload.type === 'string') accept(payload, false)
@@ -49,22 +68,31 @@ channel?.addEventListener('message', event => {
   }
 })
 function sleep(ms: number, signal: AbortSignal) {
-  return new Promise<void>(resolve => {
-    if (signal.aborted) { resolve(); return }
+  return new Promise<void>((resolve) => {
+    if (signal.aborted) {
+      resolve()
+      return
+    }
     const timer = setTimeout(done, ms)
-    function done() { clearTimeout(timer); signal.removeEventListener('abort', done); resolve() }
+    function done() {
+      clearTimeout(timer)
+      signal.removeEventListener('abort', done)
+      resolve()
+    }
     signal.addEventListener('abort', done, { once: true })
   })
 }
 function connectStream(ticket: string, signal: AbortSignal) {
-  return new Promise<void>(resolve => {
+  return new Promise<void>((resolve) => {
     const url = new URL(API_BASE_URL + '/events/stream')
     url.searchParams.set('ticket', ticket)
     if (lastEventId) url.searchParams.set('lastEventId', lastEventId)
     const source = new EventSource(url.toString())
     let closed = false
     let activity = Date.now()
-    const watchdog = setInterval(() => { if (Date.now() - activity >= 45000) close() }, 5000)
+    const watchdog = setInterval(() => {
+      if (Date.now() - activity >= 45000) close()
+    }, 5000)
     function close() {
       if (closed) return
       closed = true
@@ -76,15 +104,29 @@ function connectStream(ticket: string, signal: AbortSignal) {
     function handle(type: string, message: MessageEvent<string>) {
       activity = Date.now()
       let data: unknown = message.data
-      try { data = JSON.parse(message.data) as unknown } catch {}
+      try {
+        data = JSON.parse(message.data) as unknown
+      } catch {}
       accept({ type, data, id: message.lastEventId || '' })
       if (type === 'stream.superseded') close()
     }
-    source.onopen = () => { activity = Date.now(); changeStatus('live') }
+    source.onopen = () => {
+      activity = Date.now()
+      changeStatus('live')
+    }
     source.onerror = close
-    source.onmessage = event => handle('message', event)
-    for (const type of ['refiner.updated', 'refinement.created', 'file.completed', 'contingency.activated', 'contingency.resolved', 'session.revoked', 'stream.reset', 'stream.superseded']) {
-      source.addEventListener(type, event => handle(type, event as MessageEvent<string>))
+    source.onmessage = (event) => handle('message', event)
+    for (const type of [
+      'refiner.updated',
+      'refinement.created',
+      'file.completed',
+      'contingency.activated',
+      'contingency.resolved',
+      'session.revoked',
+      'stream.reset',
+      'stream.superseded',
+    ]) {
+      source.addEventListener(type, (event) => handle(type, event as MessageEvent<string>))
     }
     signal.addEventListener('abort', close, { once: true })
     if (signal.aborted) close()
@@ -95,9 +137,19 @@ async function streamLoop(signal: AbortSignal) {
   while (!signal.aborted) {
     changeStatus(attempt ? 'reconnecting' : 'connecting')
     try {
-      const response: unknown = await apiRequest('/events/tickets', { method: 'POST', retry: false, signal })
-      const ticket = response && typeof response === 'object'
-        ? ('ticket' in response ? response.ticket : 'token' in response ? response.token : null) : null
+      const response: unknown = await apiRequest('/events/tickets', {
+        method: 'POST',
+        retry: false,
+        signal,
+      })
+      const ticket =
+        response && typeof response === 'object'
+          ? 'ticket' in response
+            ? response.ticket
+            : 'token' in response
+              ? response.token
+              : null
+          : null
       if (typeof ticket !== 'string' || !ticket) throw new Error('Ticket SSE inválido.')
       await connectStream(ticket, signal)
     } catch (error) {
@@ -114,6 +166,12 @@ async function streamLoop(signal: AbortSignal) {
   changeStatus('offline')
 }
 export function startGlobalEvents() {
+  const nextScope = getSessionKey()
+  if (scope !== nextScope) {
+    scope = nextScope
+    lastEventId = ''
+    seen.clear()
+  }
   const controller = new AbortController()
   let running = false
   const elect = async () => {
@@ -121,15 +179,23 @@ export function startGlobalEvents() {
     running = true
     try {
       if (navigator.locks?.request) {
-        await navigator.locks.request('lumon.sse.leader', { signal: controller.signal }, async lock => {
-          if (lock) await streamLoop(controller.signal)
-        })
+        await navigator.locks.request(
+          'lumon.sse.leader',
+          { signal: controller.signal },
+          async (lock) => {
+            if (lock) await streamLoop(controller.signal)
+          },
+        )
       } else await streamLoop(controller.signal)
-    } catch {}
-    finally { running = false }
+    } catch {
+    } finally {
+      running = false
+    }
   }
   void elect()
-  const timer = setInterval(() => { void elect() }, 6000)
+  const timer = setInterval(() => {
+    void elect()
+  }, 6000)
   return () => {
     controller.abort()
     clearInterval(timer)

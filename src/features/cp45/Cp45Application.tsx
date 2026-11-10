@@ -1,17 +1,14 @@
 /* Praise Kier */
-import { Component } from "react";
-import type { ReactNode } from "react";
-import { BrowserRouter } from "react-router-dom";
-import { Cp45Provider } from "./runtime";
-import type { Cp45Runtime } from "./context";
-import { Cp45Router } from "./routes";
-class ModuleErrorBoundary extends Component<
-  { children: ReactNode },
-  { failed: boolean }
-> {
-  state = { failed: false };
+import { Component } from 'react'
+import type { ReactNode } from 'react'
+import { BrowserRouter } from 'react-router-dom'
+import { Cp45Provider } from './runtime'
+import type { Cp45Runtime } from './context'
+import { Cp45Router } from './routes'
+class ModuleErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
   static getDerivedStateFromError() {
-    return { failed: true };
+    return { failed: true }
   }
   render() {
     if (this.state.failed)
@@ -21,8 +18,8 @@ class ModuleErrorBoundary extends Component<
           <p>Tus datos enviados se conservan en el servidor.</p>
           <a href="/refiners">Volver al directorio</a>
         </main>
-      );
-    return this.props.children;
+      )
+    return this.props.children
   }
 }
 /** Standalone host for local integration. Existing applications may mount cp45Routes instead. */
@@ -35,5 +32,5 @@ export function Cp45Application({ runtime }: { runtime: Cp45Runtime }) {
         </BrowserRouter>
       </Cp45Provider>
     </ModuleErrorBoundary>
-  );
+  )
 }

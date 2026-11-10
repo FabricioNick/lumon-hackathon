@@ -1,11 +1,11 @@
 /* Praise Kier */
-import { useState } from "react";
-import type { Refiner, RefinerPatch } from "../types/refiners";
+import { useState } from 'react'
+import type { Refiner, RefinerPatch } from '../types/refiners'
 export interface RefinerConflict {
-  original: Refiner;
-  local: RefinerPatch;
-  current: Refiner;
-  etag: string;
+  original: Refiner
+  local: RefinerPatch
+  current: Refiner
+  etag: string
 }
 export function ConflictResolver({
   conflict,
@@ -13,27 +13,23 @@ export function ConflictResolver({
   onResolve,
   onCancel,
 }: {
-  conflict: RefinerConflict;
-  busy: boolean;
-  onResolve: (patch: RefinerPatch) => void;
-  onCancel: () => void;
+  conflict: RefinerConflict
+  busy: boolean
+  onResolve: (patch: RefinerPatch) => void
+  onCancel: () => void
 }) {
-  const [choices, setChoices] = useState<Record<string, "local" | "server">>(
-    {},
-  );
-  const fields = Object.keys(conflict.local) as Array<keyof RefinerPatch>;
+  const [choices, setChoices] = useState<Record<string, 'local' | 'server'>>({})
+  const fields = Object.keys(conflict.local) as Array<keyof RefinerPatch>
   function value(refiner: Refiner, key: keyof RefinerPatch) {
-    if (key === "departmentId") return refiner.department.name;
-    if (key === "badgeMediaId") return refiner.badge?.url ?? "Sin fotocheck";
-    return refiner[key];
+    if (key === 'departmentId') return refiner.department.name
+    if (key === 'badgeMediaId') return refiner.badge?.url ?? 'Sin fotocheck'
+    return refiner[key]
   }
   function resolve() {
     const patch = Object.fromEntries(
-      Object.entries(conflict.local).filter(
-        ([key]) => choices[key] === "local",
-      ),
-    ) as RefinerPatch;
-    onResolve(patch);
+      Object.entries(conflict.local).filter(([key]) => choices[key] === 'local'),
+    ) as RefinerPatch
+    onResolve(patch)
   }
   return (
     <section
@@ -44,20 +40,18 @@ export function ConflictResolver({
         El expediente cambió
       </h2>
       <p>
-        Elige qué valor conservar en cada campo antes de guardar contra la
-        versión {conflict.current.version}.
+        Elige qué valor conservar en cada campo antes de guardar contra la versión{' '}
+        {conflict.current.version}.
       </p>
       <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead>
             <tr>
-              {["Campo", "Original", "Tu cambio", "Servidor", "Conservar"].map(
-                (label) => (
-                  <th key={label} className="p-2">
-                    {label}
-                  </th>
-                ),
-              )}
+              {['Campo', 'Original', 'Tu cambio', 'Servidor', 'Conservar'].map((label) => (
+                <th key={label} className="p-2">
+                  {label}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -67,33 +61,25 @@ export function ConflictResolver({
                 <td className="max-w-48 break-words p-2">
                   {String(value(conflict.original, key))}
                 </td>
-                <td className="max-w-48 break-words p-2">
-                  {String(conflict.local[key])}
-                </td>
-                <td className="max-w-48 break-words p-2">
-                  {String(value(conflict.current, key))}
-                </td>
+                <td className="max-w-48 break-words p-2">{String(conflict.local[key])}</td>
+                <td className="max-w-48 break-words p-2">{String(value(conflict.current, key))}</td>
                 <td className="p-2">
                   <label className="block">
                     <input
                       type="radio"
                       name={`resolve-${key}`}
-                      checked={choices[key] === "local"}
-                      onChange={() =>
-                        setChoices({ ...choices, [key]: "local" })
-                      }
-                    />{" "}
+                      checked={choices[key] === 'local'}
+                      onChange={() => setChoices({ ...choices, [key]: 'local' })}
+                    />{' '}
                     Mi cambio
                   </label>
                   <label className="block">
                     <input
                       type="radio"
                       name={`resolve-${key}`}
-                      checked={choices[key] === "server"}
-                      onChange={() =>
-                        setChoices({ ...choices, [key]: "server" })
-                      }
-                    />{" "}
+                      checked={choices[key] === 'server'}
+                      onChange={() => setChoices({ ...choices, [key]: 'server' })}
+                    />{' '}
                     Servidor
                   </label>
                 </td>
@@ -102,15 +88,12 @@ export function ConflictResolver({
           </tbody>
         </table>
       </div>
-      <button
-        disabled={busy || fields.some((key) => !choices[key])}
-        onClick={resolve}
-      >
+      <button disabled={busy || fields.some((key) => !choices[key])} onClick={resolve}>
         Guardar resolución
-      </button>{" "}
+      </button>{' '}
       <button disabled={busy} onClick={onCancel}>
         Volver al editor
       </button>
     </section>
-  );
+  )
 }

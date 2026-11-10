@@ -302,7 +302,11 @@ export class FloorClient {
     this.cursorTimer = setTimeout(
       () => {
         this.cursorTimer = undefined
-        if (document.visibilityState !== 'hidden' && this.state.status === 'ready' && this.lastCursor) {
+        if (
+          document.visibilityState !== 'hidden' &&
+          this.state.status === 'ready' &&
+          this.lastCursor
+        ) {
           this.send({ type: 'cursor', ...this.lastCursor })
           this.cursorAt = Date.now()
         }

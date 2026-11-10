@@ -22,9 +22,14 @@ export default function FilesPage() {
   )
   const [failure, setFailure] = useState({ query: '', retry: 0, message: '' })
   const [retry, setRetry] = useState(0)
-  useEffect(() => subscribeEvents(event => {
-    if (['refinement.created', 'file.completed', 'stream.reset'].includes(event.type)) setRetry(n => n + 1)
-  }), [])
+  useEffect(
+    () =>
+      subscribeEvents((event) => {
+        if (['refinement.created', 'file.completed', 'stream.reset'].includes(event.type))
+          setRetry((n) => n + 1)
+      }),
+    [],
+  )
   const canRead = user?.permissions.includes('files:read')
   useEffect(() => {
     if (params.toString() !== query) setParams(query, { replace: true })

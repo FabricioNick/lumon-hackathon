@@ -91,7 +91,12 @@ export async function rawRequest(path: string, options: Options = {}): Promise<R
           ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
           ...(options.key ? { 'Idempotency-Key': options.key } : {}),
         },
-        body: options.body === undefined ? undefined : typeof options.body === 'string' ? options.body : JSON.stringify(options.body),
+        body:
+          options.body === undefined
+            ? undefined
+            : typeof options.body === 'string'
+              ? options.body
+              : JSON.stringify(options.body),
       })
     } catch (error) {
       if (aborted(error) || !retryable || attempt >= 4) throw error
@@ -138,12 +143,22 @@ export async function rawRequest(path: string, options: Options = {}): Promise<R
     return response
   }
 }
-export async function request<T>(path: string, schema: z.ZodType<T>, options: Options = {}): Promise<T> {
+export async function request<T>(
+  path: string,
+  schema: z.ZodType<T>,
+  options: Options = {},
+): Promise<T> {
   const response = await rawRequest(path, options)
   const body: unknown = response.status === 204 ? null : await response.json()
   if (!response.ok) {
     const parsed = errorSchema.safeParse(body)
-    throw new ApiError(response.status, parsed.success ? parsed.data.error : 'HTTP_ERROR', parsed.success ? parsed.data.message : `Error HTTP ${response.status}`, parsed.success ? parsed.data.details : undefined, retryAfter(response.headers.get('Retry-After')))
+    throw new ApiError(
+      response.status,
+      parsed.success ? parsed.data.error : 'HTTP_ERROR',
+      parsed.success ? parsed.data.message : `Error HTTP ${response.status}`,
+      parsed.success ? parsed.data.details : undefined,
+      retryAfter(response.headers.get('Retry-After')),
+    )
   }
   return schema.parse(body)
 }
